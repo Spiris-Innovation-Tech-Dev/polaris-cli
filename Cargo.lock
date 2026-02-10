@@ -1063,7 +1063,7 @@ dependencies = [
  "serde_json",
  "tabled",
  "tokio",
- "toon-format",
+ "toon-rs",
  "urlencoding",
  "whoami",
 ]
@@ -2050,13 +2050,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "toon-format"
-version = "0.1.0"
+name = "toon-rs"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e389072c64cabde0f6c4b3e35f697c6c4e04973a1c42a30d1aa73e20e1f34e43"
 dependencies = [
- "indexmap",
+ "ryu",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

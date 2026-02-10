@@ -64,7 +64,7 @@ fn emit(val: &serde_json::Value, fmt: &OutputFormat) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(val)?);
         }
         OutputFormat::Toon => {
-            let toon = toon_format::encode_default(val)
+            let toon = toon_rs::encode_to_string(val, &toon_rs::Options::default())
                 .map_err(|e| anyhow::anyhow!("TOON encode error: {e}"))?;
             println!("{toon}");
         }
