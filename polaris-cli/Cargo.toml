@@ -15,7 +15,7 @@ serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 tabled = "0.17"
 anyhow = "1"
-toon-format = { path = "/Users/js/code/3rd/toon/toon-rust" }
+toon-rs = "2.1.0"
 urlencoding = "2"
 keyring = { version = "3", features = ["apple-native"] }
 whoami = "1"
