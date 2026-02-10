@@ -1,0 +1,663 @@
+openapi: 3.0.0
+info:
+  version: V1
+  title: Triage Query Service
+  description: >
+    ## Description
+
+    This is a read-only web server that provides access to triage-related data. Triage Command Service is used to write triage data.
+tags:
+  - name: Triage Query
+paths:
+  /triage-current:
+    get:
+      tags:
+        - Triage Query
+      summary: Fetch triage-current resources
+      description: Finds the current triage status for a single issue in the context
+        of a project.
+      operationId: triage-current - findAll (Fetch triage-current resources)
+      parameters:
+        - name: filter[triage-current][issue-key][$eq]
+          in: query
+          description: >-
+            Filter results by issue key
+
+
+            E.g. 144a2a83939d8ed4a3fc527e05ef95f9a6f912613307f49d56aa4b6cc866a42b
+          required: true
+          schema:
+            type: string
+        - name: filter[triage-current][project-id][$eq]
+          in: query
+          description: >-
+            Filter results by project id
+
+
+            E.g. filter[triage-current][project-id][eq]=7c3d1a52-b863-430b-99bb-0362141e39b8
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageCurrentV1JsonApiResources"
+        "400":
+          description: When the specified request is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: When the issue specified by the filter parameters cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  "/triage-current/{id}":
+    get:
+      tags:
+        - Triage Query
+      summary: Fetch a triage-current resource by id
+      description: Finds the current triage status for a single issue in the context
+        of a project. Supported id is
+        'project-id:285b87f0-...:issue-key:av3sd...'
+      operationId: triage-current - findOne (Fetch a triage-current resource by id)
+      parameters:
+        - name: id
+          in: path
+          description: Resource identifier
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageCurrentV1JsonApiResource"
+        "404":
+          description: When the issue specified by the filter parameters cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /triage-history-items:
+    get:
+      tags:
+        - Triage Query
+      summary: Fetch triage-history-items resources
+      description: Finds the triage history for a single issue in the context of a project.
+      operationId: triage-history-items - findAll (Fetch triage-history-items resources)
+      parameters:
+        - name: filter[triage-history-items][project-id][$eq]
+          in: query
+          description: The project-id for which to find triage history.
+          required: true
+          schema:
+            type: string
+        - name: filter[triage-history-items][issue-key][$eq]
+          in: query
+          description: The key of the issue for which to find triage history.
+          required: true
+          schema:
+            type: string
+        - name: page[limit]
+          in: query
+          description: The maximum number of items to be returned in the request.
+          required: true
+          schema:
+            type: integer
+        - name: page[offset]
+          in: query
+          description: The item offset to start the page at.
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageHistoryItemV1JsonApiResources"
+        "400":
+          description: When the specified request is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: When the specified request was valid, but the server is refusing
+            action.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: When the issue specified by the filter parameters cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /triage-stores:
+    get:
+      tags:
+        - Triage Query
+      summary: Fetch triage-stores resources
+      description: Finds all of the triage stores visible to the authenticated user.
+      operationId: triage-stores - findAll (Fetch triage-stores resources)
+      parameters:
+        - name: page[limit]
+          in: query
+          description: The maximum number of items to be returned in the request.
+          required: false
+          schema:
+            type: integer
+        - name: page[offset]
+          in: query
+          description: The item offset to start the page at.
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageStoreV1JsonApiResources"
+  "/triage-stores/{id}":
+    get:
+      tags:
+        - Triage Query
+      summary: Fetch a triage-stores resource by id
+      description: If the authenticated user does not have permission to view the
+        record for the given ID, the response will appear the same as
+        querying  for a record that does not exist (404 Not Found).
+      operationId: triage-stores - findOne (Fetch a triage-stores resource by id)
+      parameters:
+        - name: id
+          in: path
+          description: Resource identifier
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageStoreV1JsonApiResource"
+        "404":
+          description: Triage Store not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+servers:
+  - url: https://your-instance.polaris.blackduck.com/api/triage-query/v1
+components:
+  schemas:
+    Attribute:
+      type: object
+      discriminator:
+        propertyName: type
+      properties:
+        type:
+          type: string
+        deprecated:
+          type: boolean
+        name:
+          type: object
+          additionalProperties:
+            type: string
+        id:
+          type: string
+        writeOnly:
+          type: boolean
+      required:
+        - type
+    Enumerated:
+      allOf:
+        - $ref: "#/components/schemas/Attribute"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+              readOnly: true
+            name:
+              type: object
+              readOnly: true
+              additionalProperties:
+                type: string
+            selections:
+              type: array
+              readOnly: true
+              items:
+                $ref: "#/components/schemas/Selection"
+              minItems: 1
+            deprecated:
+              type: boolean
+              readOnly: true
+            unset-name:
+              type: object
+              additionalProperties:
+                type: string
+    ErrorResponse:
+      type: object
+      properties:
+        queryParams:
+          $ref: "#/components/schemas/QueryParams"
+        jsonPath:
+          $ref: "#/components/schemas/JsonPath"
+        linksInformation:
+          $ref: "#/components/schemas/LinksInformation"
+        metaInformation:
+          $ref: "#/components/schemas/MetaInformation"
+        errors:
+          $ref: "#/components/schemas/IterableErrorData"
+    FilterParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            type: array
+            uniqueItems: true
+            items:
+              type: string
+    GroupingParams:
+      type: object
+      properties:
+        params:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    IncludedFieldsParams:
+      type: object
+      properties:
+        params:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    IncludedRelationsParams:
+      type: object
+      properties:
+        params:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Inclusion"
+    Inclusion:
+      type: object
+      properties:
+        path:
+          type: string
+        pathList:
+          type: array
+          items:
+            type: string
+    Iterable:
+      type: object
+    IterableErrorData:
+      type: object
+    JsonPath:
+      type: object
+      properties:
+        elementName:
+          type: string
+        ids:
+          $ref: "#/components/schemas/PathIds"
+        collection:
+          type: boolean
+        resourceName:
+          type: string
+    LinksInformation:
+      type: object
+    MetaInformation:
+      type: object
+    ObjectContainer:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+    PathIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+    QueryParams:
+      type: object
+      properties:
+        filters:
+          $ref: "#/components/schemas/TypedParamsFilterParams"
+        sorting:
+          $ref: "#/components/schemas/TypedParamsSortingParams"
+        grouping:
+          $ref: "#/components/schemas/TypedParamsGroupingParams"
+        includedFields:
+          $ref: "#/components/schemas/TypedParamsIncludedFieldsParams"
+        includedRelations:
+          $ref: "#/components/schemas/TypedParamsIncludedRelationsParams"
+        pagination:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+    Selection:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: object
+          readOnly: true
+          additionalProperties:
+            type: string
+        deprecated:
+          type: boolean
+          readOnly: true
+    SortingParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - asc
+              - desc
+    Text:
+      allOf:
+        - $ref: "#/components/schemas/Attribute"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+              readOnly: true
+            name:
+              type: object
+              readOnly: true
+              additionalProperties:
+                type: string
+            deprecated:
+              type: boolean
+              readOnly: true
+            max-length:
+              type: integer
+              format: int32
+              readOnly: true
+    ToManyRelationship:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectContainer"
+    TriageCurrentV1JsonApi:
+      type: object
+      properties:
+        attributes:
+          $ref: "#/components/schemas/TriageCurrentV1JsonApi_attributes"
+        id:
+          type: string
+        relationships:
+          $ref: "#/components/schemas/TriageCurrentV1JsonApi_relationships"
+        type:
+          type: string
+      description: triage-current
+    TriageCurrentV1JsonApiResource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TriageCurrentV1JsonApi"
+      description: Resource container for TriageCurrentV1JsonApi
+    TriageCurrentV1JsonApiResources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TriageCurrentV1JsonApi"
+      description: Resource container for TriageCurrentJsonApi
+    TriageCurrentV1JsonApi_attributes:
+      type: object
+      required:
+        - triage-current-values
+      properties:
+        issue-key:
+          type: string
+        project-id:
+          type: string
+        dismissal-status:
+          type: string
+          description: >
+            The triage workflow status of an issue. Available options are: <br/>
+            REQUESTED - A dismiss is requested by a non admin user<br/>
+            USER_APPROVED - The dismiss request has been approved by an admin
+            user<br/> USER_REJECTED - The dismiss request has been rejected by
+            an admin user<br/> SYSTEM_APPROVED - Default approval if workflow is
+            off or an admin dismisses<br/>
+        triage-current-values:
+          type: array
+          items:
+            type: object
+      description: Attributes for TriageCurrentJsonApi
+    TriageCurrentV1JsonApi_relationships:
+      type: object
+      description: Relationships for TriageCurrentJsonApi
+    TriageHistoryItemV1JsonApi:
+      type: object
+      properties:
+        attributes:
+          $ref: "#/components/schemas/TriageHistoryItemV1JsonApi_attributes"
+        id:
+          type: string
+          format: uuid
+        relationships:
+          $ref: "#/components/schemas/TriageHistoryItemV1JsonApi_relationships"
+        type:
+          type: string
+      description: triage-history-items
+    TriageHistoryItemV1JsonApiResources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TriageHistoryItemV1JsonApi"
+      description: Resource container for TriageHistoryItemJsonApi
+    TriageHistoryItemV1JsonApi_attributes:
+      type: object
+      required:
+        - timestamp
+        - triage-history-values
+      properties:
+        author:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        dismissal-status:
+          type: string
+          description: >
+            The triage workflow status of an issue. Available options are: <br/>
+            REQUESTED - A dismiss is requested by a non admin user<br/>
+            USER_APPROVED - The dismiss request has been approved by an admin
+            user<br/> USER_REJECTED - The dismiss request has been rejected by
+            an admin user<br/> SYSTEM_APPROVED - Default approval if workflow is
+            off or an admin dismisses<br/>
+        triage-history-values:
+          type: array
+          items:
+            type: object
+      description: Attributes for TriageHistoryItemV1JsonApi
+    TriageHistoryItemV1JsonApi_relationships:
+      type: object
+      description: Relationships for TriageHistoryItemV1JsonApi
+    TriageStoreV1JsonApi:
+      type: object
+      properties:
+        attributes:
+          $ref: "#/components/schemas/TriageStoreV1JsonApi_attributes"
+        id:
+          type: string
+          format: uuid
+        relationships:
+          $ref: "#/components/schemas/TriageStoreV1JsonApi_relationships"
+        type:
+          type: string
+      description: triage-stores
+    TriageStoreV1JsonApiResource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TriageStoreV1JsonApi"
+      description: Resource container for TriageStoreJsonApi
+    TriageStoreV1JsonApiResources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TriageStoreV1JsonApi"
+      description: Resource container for TriageStoreV1JsonApi
+    TriageStoreV1JsonApi_attributes:
+      type: object
+      required:
+        - project-urns
+        - schema
+      properties:
+        project-urns:
+          type: array
+          uniqueItems: true
+          items:
+            type: object
+        schema:
+          $ref: "#/components/schemas/TriageStoreSchema"
+      description: Attributes for TriageStoreV1JsonApi
+    TriageStoreV1JsonApi_relationships:
+      type: object
+      properties:
+        triage-attributes:
+          $ref: "#/components/schemas/ToManyRelationship"
+      description: Relationships for TriageStoreJsonApi
+    TriageStoreSchema:
+      type: object
+      properties:
+        name:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attribute"
+        description:
+          type: object
+          additionalProperties:
+            type: string
+    TriageStoreSchemaV0:
+      allOf:
+        - $ref: "#/components/schemas/TriageStoreSchema"
+        - type: object
+          required:
+            - attributes
+            - description
+          properties:
+            name:
+              type: string
+              readOnly: true
+              minLength: 1
+            description:
+              type: object
+              readOnly: true
+              additionalProperties:
+                type: string
+            attributes:
+              type: array
+              readOnly: true
+              items:
+                $ref: "#/components/schemas/Attribute"
+    TypedParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            type: object
+    TypedParamsFilterParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/FilterParams"
+    TypedParamsGroupingParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/GroupingParams"
+    TypedParamsIncludedFieldsParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/IncludedFieldsParams"
+    TypedParamsIncludedRelationsParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/IncludedRelationsParams"
+    TypedParamsSortingParams:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SortingParams"
+    UserAttribute:
+      allOf:
+        - $ref: "#/components/schemas/Attribute"
+        - type: object
+          properties:
+            id:
+              type: string
+              readOnly: true
+            name:
+              type: object
+              readOnly: true
+              additionalProperties:
+                type: string
+            deprecated:
+              type: boolean
+              readOnly: true
+            unset-name:
+              type: object
+              additionalProperties:
+                type: string
