@@ -1,0 +1,3428 @@
+openapi: 3.0.0
+info:
+  description: |-
+    The Auth. Service provides authentication and authorization for all public APIs of the Polaris Platform. The auth. service acts like a gate-keeper in the platform allowing or rejecting access to resources. 
+     - Authentication configurations can be managed with endpoints api-tokens and SAML identity providers while entitlements and role-assignments assist in authorization.
+     - Other endpoints allow managing organizations, groups, users, roles, licenses and terms-of-use.
+
+    Version 2 of the auth. service hosts REST endpoints using both json-api and non-json-api. Roles, role assignments, entitlements and users endpoints have been enhanced in this version to support the addition of application manager role. This documentation is used to improve the discoverability of these services. 
+
+
+    <h4>Supported filtering operators</h4> <table> <tr> <td>`$eq`</td> <td>Tests case-sensitive equality to the provided value.</td> </tr> <tr> <td>`$neq`</td> <td>Tests case-sensitive inequality to the provided value.</td> </tr> <tr> <td>`$substr`</td> <td>Tests case-sensitive substring matching of the provided value.</td> </tr> <tr> <td>`$isubstr`</td> <td>Tests case-insensitive substring matching of the provided value.</td> </tr> </table>
+  version: v2
+  title: Auth Service - v2
+  contact:
+    name: Black Duck Software, Inc.
+    url: https://www.blackduck.com
+tags:
+  - name: API Tokens
+    description: The *API Tokens* API allows users to create new API tokens to use for authentication. Users can also read the tokens they have and revoke any that they no longer need.
+  - name: Authentication
+    description: The *Authentication* API provides different endpoints related to authentication, including different methods for users to login, logging out of the platform, resetting passwords, and support for switching between organizations for multi-organization users.
+  - name: Authorization
+    description: The *Authorization* API allows users or groups to be assigned roles for various objects in Polaris.
+  - name: Groups
+    description: "*Groups* are a collection of users that can perform similar actions. The main use case for groups is to provide all of the users in the group, permissions to a certain project. The Groups API can be used to create and manage groups."
+  - name: Licenses
+    description: The *Licenses* API allows user's to read thier active and historic platform license information.
+  - name: Organizations
+    description: "*Organizations* encapsulate all of the domain objects handled by the auth-service. All other domain objects are created within the context of an organization. You can use the Organizations API to read or update information about your organization."
+  - name: SAML Configuration
+    description: The various *SAML* APIs support the creation and management of a *SAML Identity Provider*. These SAML IdPs allow your organization to authenticate through your preferred identity provider (e.g. Okta, Azure AD, etc.).
+  - name: Terms Of Use
+    description: The *Terms of use* API allow users to both read and accept the Polaris terms of use.
+  - name: Users
+    description: "*Users* represent you, the user. You can use the Users API to create new users, update existing users, or query all users that exist in your organization."
+  - name: API Documentation
+    description: The *API Documentation* API provides the raw swagger files that power the swagger UI you are looking at right now.
+  - name: Internal APIs
+    description: These APIs are not available for regular users. They are mainly used internally by other Polaris services to help facilitate certain actions.
+paths:
+  /accept-terms-of-use:
+    put:
+      tags:
+        - Terms Of Use
+      summary: Accept the Polaris terms of use specified by id.
+      description: This endpoint is used to record that an authenticated user has accepted the terms of use.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  description: The ID of the terms-of-use document, as returned from /terms-of-use
+                  type: string
+      responses:
+        "201":
+          description: The TermsOfUse were agreed to.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/terms-of-use"
+        "204":
+          description: The TermsOfUse have already been agreed to.
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+      operationId: put_accept_terms_of_use
+  /api-docs/{file}:
+    parameters:
+      - name: file
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - API Documentation
+      summary: Fetch the raw swagger file by filename.
+      responses:
+        "401":
+          description: The caller is not authenticated.
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        default:
+          description: successfully returned the raw swagger file
+      operationId: get_api_docs_file
+  /apitokens:
+    get:
+      tags:
+        - API Tokens
+      summary: Get all API tokens created by the authenticated user.
+      description: Finds all of the API tokens visible to the authenticated user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesApiTokens"
+      responses:
+        "200":
+          description: Successfully returned all the API tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APITokenResources"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The filtered API token was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_apitokens
+    post:
+      tags:
+        - API Tokens
+      summary: Create a new API token.
+      description: |-
+        Creates a new API Token for the authenticated caller. This call expects the body of the request to contain an APIToken entity, but only the 'name' is used to identify the API Token.
+
+        The `jwt` attribute of the token in the response may be used as a bearer token for future requests.
+
+        The 'id' in the response entity must be used to revoke the token with DELETE at a later time.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/APITokenResource"
+        description: APITokenResource
+      responses:
+        "200":
+          description: Successfully created the API Token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APITokenResource"
+      operationId: post_apitokens
+  /apitokens/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: API Token identifier
+        required: true
+        schema:
+          type: string
+          format: string
+    get:
+      tags:
+        - API Tokens
+      summary: Fetch an API Token by id.
+      description: If the authenticated user does not have permission to view the Record for the given ID, the response will appear  the same as querying  for a record that does not exist (404 Not Found).
+      responses:
+        "200":
+          description: Successfully returned the API Token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APITokenResource"
+        "404":
+          description: API Token not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_apitokens_id
+    delete:
+      tags:
+        - API Tokens
+      summary: Revoke an API Token.
+      description: Revoke the API token with the given id. This token will no longer be accepted by the auth service. Other services are responsible for checking the revocation status of an API Token if they are allowing API Tokens for authenticated access.
+      parameters:
+        - name: id
+          in: path
+          description: API Token identifier
+          required: true
+          schema:
+            type: string
+            format: string
+      responses:
+        "200":
+          description: Successfully deleted the API Token
+        "404":
+          description: API Token not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: delete_apitokens_id
+  /authenticate:
+    post:
+      tags:
+        - Authentication
+      summary: Login using email/password, API token, or refresh your existing JWT.
+      description: |-
+        This is the first point of entry to the auth service API. It is responsible for providing a JSON Web Token (JWT) that will be used to access all other endpoints, as well as other services.
+
+        /authenticate supports authenticating with username/password. It is also used to refresh an existing token. All subsequent communication performed with the `access_token` cookie will enable authenticated endpoints to know the identity of the calling User. 
+
+        Successful requests will return a response with a cookie, `access_token`, or a JWT in the body of the request`jwt`.
+
+        If the call to /authenticate is being made with a valid `access_token` cookie, OR a bearer token in the `Authorization` header, then all form parameters with the exception of `returnurl` will be ignored.
+
+        When calling `/authenticate?accesstoken=...` with an API Token the endpoint will generate a new JWT that may be used as a bearer token. Without this step, the API Token will not be understood by any other service.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                returnurl:
+                  description: A 302 FOUND redirect is returned in the Response if a `returnurl`
+                  type: string
+                organizationname:
+                  description: May be provided if username/password is specified  to force the
+                  type: string
+                email:
+                  description: Supply an email address for the user signing in. This is not
+                  type: string
+                password:
+                  description: Supply a password that is used in conjunction with `username`
+                  type: string
+                accesstoken:
+                  description: Supply a token, provided when creating an API Token, to get
+                  type: string
+      responses:
+        "200":
+          description: |-
+            200 OK is returned after successful authentication when `returnurl` is not supplied.
+
+            The response may set the cookies `access_token` and `access_token_exp_sec`. If authenticating with an API token or as a service account, no cookie will be issued and instead the JWT will be provided in the repsonse body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticateSuccessResponse"
+        "302":
+          description: If `returnurl` was specified, it will be set in the `Location` header after successfully authenticating with username/password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        "401":
+          description: The `error` field of the response will be `invalid_client`. As per [RFC 6749](https://tools.ietf.org/html/rfc6749), this error response signifies that authentication failed, or an unsupported authentication method was supplied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Authentication was successful, but a valid organization where the matching account is enabled could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_authenticate
+  /authenticate/lookup:
+    post:
+      tags:
+        - Authentication
+      summary: If SAML is configured, this redirects to the identity provider; otherwise login through the /authenticate endpoint.
+      description: The user must supply an email address. If the email domain is registered as a SAML email domain for an organization which is SAML enabled, the user will be redirected to the organization's registered SAML Identity Provider. Otherwise a 204 NO CONTENT response will be returned to indicate that email/password login is still required.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                email:
+                  description: Supply an email address for the user signing in. This is not
+                  type: string
+                organizationname:
+                  description: May be provided to force the lookup in a specific organization.
+                  type: string
+      responses:
+        "200":
+          description: If the registered email domain or user belongs to a SAML-enabled organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedirectToOAuthResponse"
+        "204":
+          description: If the unregistered email domain or user does not belong to a SAML-enabled organization.
+        "400":
+          description: No email address specified, or the email address is not well formed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: We cannot redirect the user to their SAML Identity Provider. Potential configuration issue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_authenticate_lookup
+  /contexts:
+    get:
+      tags:
+        - Authentication
+      summary: Get the organization(s) in which the authenticated user's email exists.
+      description: Return all of the available Contexts for the authenticated principal.
+      responses:
+        "200":
+          description: Successfully retrieved the context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextResources"
+      operationId: get_contexts
+  /entitlements:
+    get:
+      tags:
+        - Authorization
+      summary: Fetch an entitlement filtered by object URN.
+      description: Fetch a list of entitlements for the authenticated user. An Entitlement represents the operations that may be performed by a subject in the context of an Object. In security-speak, the 'subject' is the authenticated user making the GET request. The 'object' is any resource under access control, such as an Organization or a Project. Objects are represented as a urn, such as `urn:x-swip:projects:p1.
+      parameters:
+        - $ref: "#/components/parameters/entitlementsFilterByObject"
+        - $ref: "#/components/parameters/entitlementsFilterOnBehalfOf"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+      responses:
+        "200":
+          description: Successfully returned all entitlements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitlementResources"
+      operationId: get_entitlements
+  /entitlements/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Entitlement 'object' identifier, or comma-separated list of identifiers in URN format
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Authorization
+      summary: Fetch one or more entitlements by entitlement id.
+      description: Fetches an entitlement by entitlement identifier.
+      responses:
+        "200":
+          description: Successfully returned entitlement by id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitlementResource"
+      operationId: get_entitlements_id
+  /groups:
+    get:
+      tags:
+        - Groups
+      summary: Get all groups.
+      description: Return all of the Groups that are visible to the authenticated user.
+      parameters:
+        - $ref: "#/components/parameters/groupsFilterByKey"
+        - $ref: "#/components/parameters/groupsFilterByName"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesGroups"
+      responses:
+        "200":
+          description: Successfully returned the groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResources"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Groups not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_groups
+    post:
+      tags:
+        - Groups
+      summary: Create a new group.
+      description: "creates the group with the given name.The group name must be unique, must not start with a hyphen (-) and it accepts all the unicode characters ranging from U+0000 to U+FFFF "
+      parameters:
+        - $ref: "#/components/parameters/includesGroups"
+      requestBody:
+        $ref: "#/components/requestBodies/GroupResource"
+      responses:
+        "200":
+          description: Successfully created the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResource"
+        "403":
+          description: Insufficient permission to create a new Group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, that group name is already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_groups
+  /groups/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Group identifier
+        required: true
+        schema:
+          type: string
+          format: string
+    get:
+      tags:
+        - Groups
+      summary: Fetch a group by id.
+      description: Returns the group specified by the id, if the authenticated user does not have permission to view the Record with the given ID, the response will be the same as querying for a record that does not exist (404 Not Found).
+      parameters:
+        - $ref: "#/components/parameters/includesGroups"
+      responses:
+        "200":
+          description: Successfully returned the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResource"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_groups_id
+    delete:
+      tags:
+        - Groups
+      summary: Delete a group.
+      description: Delete the group with the given id. This will also remove all subGroups, if any exist beneath this group. All Users that are members of this group or any of its subgroups, shall be removed as members of these groups.
+      responses:
+        "200":
+          description: Successfully deleted the group
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: delete_groups_id
+    patch:
+      tags:
+        - Groups
+      summary: Update a group.
+      description: "Creates the group with the given name.The group name must be unique, must not start with a hyphen (-) and it accepts all the unicode characters ranging from U+0000 to U+FFFF "
+      parameters:
+        - $ref: "#/components/parameters/includesGroups"
+      requestBody:
+        $ref: "#/components/requestBodies/GroupResource"
+      responses:
+        "200":
+          description: Successfully updated/created the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResource"
+        "403":
+          description: Insufficient permission to update a Group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, that group name is already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: patch_groups_id
+  /hostNamePrefixes:
+    get:
+      tags:
+        - Internal APIs
+      summary: Get a list of host name prefixes
+      description: Return a list of host name prefixes. This is a list of all organizationname in the database.
+      responses:
+        "200":
+          description: Successfully returned all host-name prefixes for the organization
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                example:
+                  - foo
+                  - bar
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+      operationId: get_hostNamePrefixes
+  /impersonate/{userid}:
+    parameters:
+      - name: userid
+        in: path
+        description: The ID, encoded in Base32, of the User to impersonate
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - Internal APIs
+      summary: Fetch a webtoken to impersonate another User.
+      description: |-
+        Any User with the `auth.impersonateUser` statement enabled in their policy will be able to impersonate any other User that is visible to them.
+
+        The call to /impersonate/${userid} must be made with a valid `access_token` cookie, OR a bearer token in the `Authorization` header. This will be used to ascertain the identity of the impersonator.
+      responses:
+        "200":
+          description: A successful request will return a response that contains a new, time limited JWT, that can be used to make web service requests on behalf of the impersonated User.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthTokenResponse"
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        "403":
+          description: |-
+            The impersonator has read permission for the User matching userid but does not have sufficient permission to impersonate the user. This may be because `auth.impersonateUser` statement is not  set to ALLOW in the impersonator's policy.
+
+            This may also return if the impersonator making the request is already impersonating another user. Credentials that are already used for impersonation cannot be used to impersonate another user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The userid provided could not be resolved to a User. Either the User does not exist, or the impersonator does not have sufficient permission to see the user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_impersonate_userid
+  /licenses:
+    get:
+      tags:
+        - Licenses
+      summary: Get all licenses.
+      description: Return all of the Licenses that are visible to the authenticated user.
+      parameters:
+        - $ref: "#/components/parameters/licensesFilterByKey"
+        - $ref: "#/components/parameters/licensesFilterByOrganizationId"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesLicenses"
+      responses:
+        "200":
+          description: Successfully returned all licences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseJsonApiResources"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Licenses not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_licenses
+    post:
+      tags:
+        - Internal APIs
+      summary: Import a License.
+      description: Imports a License for the Organization listed in the `issuedTo` field.
+      parameters:
+        - $ref: "#/components/parameters/includesLicenses"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LicenseRequest"
+        description: Version 1 of the License resource
+      responses:
+        "200":
+          description: The license has already been imported and claimed by the Organization in the 'issuedTo' field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseAlreadyImportedResponse"
+        "201":
+          description: The license was successfully imported and claimed by the Organization in the 'issuedTo' field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseResponse"
+        "403":
+          description: The caller has insufficient permission to import a license either because of their access control, or because the license refers to an Organization for which the caller has insufficient access.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: This license has already been imported by another Organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_licenses
+  /licenses/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: License identifier
+        required: true
+        schema:
+          type: string
+          format: string
+      - $ref: "#/components/parameters/includesLicenses"
+    get:
+      tags:
+        - Licenses
+      summary: Fetch a license by id.
+      description: If the authenticated user does not have permission to view the Record for the given ID, the response will appear the same as querying for a record that does not exist (404 Not Found).
+      responses:
+        "200":
+          description: Successfully retrieved the license
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseJsonApiResource"
+        "404":
+          description: License not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_licenses_id
+    delete:
+      tags:
+        - Internal APIs
+      summary: Revoke a license.
+      description: Revoke a license by ID. Returns the license that was revoked.
+      responses:
+        "200":
+          description: Successfully revoked the license
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/License"
+        "403":
+          description: The caller has insufficient permission to revoke a license
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The license could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: delete_licenses_id
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout of Polaris.
+      description: |-
+        This will request the caller to clear their `access_token` and `access_token_exp_sec` cookies.
+
+        If the POST to /logout contains `access_token` or `access_token_exp_sec` cookies, they will be cleared on the client. Because the auth service is session-less by design, this call has no effect on the server. Do _not_ depend on this logic, as server-side cookie tracking and revocation may be added in the future.
+      responses:
+        "200":
+          description: The 200 OK response will include set-cookie headers for `access_token` and `access_token_exp_sec`, if they appear in the request with a 0 _Max-Age_ and DELETED _value_ to replace the existing values.
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/Response"
+      operationId: post_logout
+  /organizations:
+    get:
+      tags:
+        - Organizations
+      summary: Get all organizations.
+      description: Only the organization the currently authenticated user is in will be returned from this call as that is the only organization visible to them. We support a variety of filters on them but they ultimately don't change the response (for a valid filter) in the case of regular users.
+      parameters:
+        - $ref: "#/components/parameters/organizationFilterByOrganizationName"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesOrganizations"
+      responses:
+        "200":
+          description: Successfully returned the organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResources"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The filtered organization was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_organizations
+    post:
+      tags:
+        - Internal APIs
+      summary: Create an organization.
+      description: This endpoint is reserved for system use. The creation of organizations is done before normal users have access to Polaris.
+      parameters:
+        - $ref: "#/components/parameters/includesOrganizations"
+      requestBody:
+        $ref: "#/components/requestBodies/OrganizationResource"
+      responses:
+        "200":
+          description: Successfully created the organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResource"
+        "403":
+          description: Insufficient permission to create a new organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, that organization name or description is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_organizations
+  /organizations/{id}:
+    get:
+      tags:
+        - Organizations
+      summary: Fetch an organization by id.
+      description: Only the organization the currently authenticated user is in can be returned from this call.
+      parameters:
+        - name: id
+          in: path
+          description: Organization id
+          required: true
+          schema:
+            type: string
+            format: string
+        - $ref: "#/components/parameters/includesOrganizations"
+      responses:
+        "200":
+          description: Successfully returned the organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResource"
+        "404":
+          description: The organization was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_organizations_id
+    patch:
+      tags:
+        - Organizations
+      summary: Update an organization.
+      description: "Organization information can be updated using this endpoint. This includes updating the organizationname, description, owners, and authentication methods. Note: There must always be at least one owner, so trying to remove all of the owners in an update call will result in an error."
+      parameters:
+        - name: id
+          in: path
+          description: Organization id
+          required: true
+          schema:
+            type: string
+            format: string
+        - $ref: "#/components/parameters/includesOrganizations"
+      requestBody:
+        $ref: "#/components/requestBodies/OrganizationResource"
+      responses:
+        "200":
+          description: Successfully updated the organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResource"
+        "403":
+          description: Insufficient permissions to update an organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The organization was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, that organization name or description is already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: patch_organizations_id
+  /resetTokens:
+    post:
+      tags:
+        - Authentication
+      summary: Request a password reset. An email will be sent with the reset token.
+      description: This will trigger a reset password notification email to be sent to the user matching the username or email address POSTed to this endpoint.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                email:
+                  description: Email address for which to reset the password. This is not case
+                  type: string
+      responses:
+        "200":
+          description: An email with instructions to complete the reset have been sent.
+        "404":
+          description: No account with the given email address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_resetTokens
+  /resetTokens/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - Authentication
+      summary: Redeem a reset token to perform the password reset.
+      description: This will redeem a password reset token that was delivered in an email to a User following a POST to /resetTokens.
+      responses:
+        "200":
+          description: When a password reset token is successfully redeemed, the caller is given a new `access_token` cookie so they can begin making authenticated requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        "403":
+          description: Invalid or expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_resetTokens_token
+  /role-assignments:
+    get:
+      tags:
+        - Authorization
+      summary: Get all role assignments.
+      description: |+
+        Fetches Role Assignments that are readable by the authenticated user.
+
+      parameters:
+        - $ref: "#/components/parameters/roleAssignmentsFilterByKey"
+        - $ref: "#/components/parameters/roleAssignmentsFilterByName"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesRoleAssignments"
+      responses:
+        "200":
+          description: Successfully returned the role-assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleAssignmentResources"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_role_assignments
+    post:
+      tags:
+        - Authorization
+      summary: Create a new role assignment.
+      description: |-
+        > Assign a role to a user on a resource (resource can be a project or an organization). 
+         Note: This endpoint requires URNs to identify resources. The format for the URN is: `urn:x-swip:{resource-name}:{resource-id}`. Refer to RoleAssignmentResource.data.attributes.object, where 'object' is (ex.) `urn:x-swip:projects:e35264d0-8d07-4502-a149-03632f5ba3e6`
+      parameters:
+        - $ref: "#/components/parameters/includesRoleAssignments"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleAssignmentResource"
+        description: RoleAssignmentResource
+      responses:
+        "200":
+          description: Successfully created the role-assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleAssignmentResource"
+        "403":
+          description: Insufficient permission to create a Role Assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The Role Assignment already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_role_assignments
+  /role-assignments/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Role-assignment identifier
+        required: true
+        schema:
+          type: string
+          format: string
+    get:
+      tags:
+        - Authorization
+      summary: Fetch a role assignment by id.
+      description: Fetches a single Role Assignment for the given ID. If the authenticated user does not have sufficient permissions to read the role assignment, or the assignment does not exist then the response will be '404 Not Found'.
+      parameters:
+        - $ref: "#/components/parameters/includesRoleAssignments"
+      responses:
+        "200":
+          description: Successfully returned the role-assignment by id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleAssignmentResource"
+        "404":
+          description: Role Assignment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_role_assignments_id
+    delete:
+      tags:
+        - Authorization
+      summary: Delete a role assignment.
+      description: Delete the Role Assignment with the given id.
+      responses:
+        "200":
+          description: Successfully deleted the specified role-assignment
+      operationId: delete_role_assignments_id
+    patch:
+      tags:
+        - Authorization
+      summary: Update a role assignment.
+      description: ""
+      Update a role-assignment for a user on a resource (resource can be a project or an organization).\n Note:
+        This endpoint requires URNs to identify resources. The format is: "`urn:x-swip:{resource-name}:{resource-id}`."
+        Refer to RoleAssignmentResource.data.attributes.object, where 'object' is (ex.) `urn:x-swip:projects:e35264d0-8d07-4502-a149-03632f5ba3e6`" consumes:
+          - application/json
+        produces:
+          - application/json
+        parameters:
+          - in: body
+            name: RoleAssignmentResource
+            description: RoleAssignmentResource
+            required: false
+            schema:
+              $ref: "#/components/schemas/RoleAssignmentResource"
+          - $ref: "#/components/parameters/includesRoleAssignments"
+        responses:
+          "200":
+            description: Successfully updated the role-assignment
+            schema:
+              $ref: "#/components/schemas/RoleAssignmentResource"
+          "403":
+            description: Insufficient permission to create a Role Assignment.
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+          "404":
+            description: Role Assignment not found.
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+          "409":
+            description: The Role Assignment already exists
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      responses:
+        default:
+          description: Default response
+      operationId: patch_role_assignments_id
+  /roles:
+    get:
+      tags:
+        - Authorization
+      summary: Get all roles.
+      description: Return all of the available Roles.
+      parameters:
+        - $ref: "#/components/parameters/roleFilterByAssignableLevels"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+      responses:
+        "200":
+          description: Successfully returned roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResources"
+        "404":
+          description: Role not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_roles
+  /roles/{id}:
+    get:
+      tags:
+        - Authorization
+      summary: Fetch a role by id.
+      description: Return a Roles with the given id, if it is visible to the authenticated user.
+      parameters:
+        - name: id
+          in: path
+          description: Role identifier
+          required: true
+          schema:
+            type: string
+            format: string
+      responses:
+        "200":
+          description: Successfully returned role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResource"
+        "404":
+          description: Role not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_roles_id
+  /saml-certificates/csr:
+    get:
+      tags:
+        - SAML Configuration
+      summary: Download the certificate signing request file to provide to the SAML identity provider.
+      description: Download the certificate signing request file for the SAML Identity Provider associated with the authenticated User's Organization.
+      responses:
+        "200":
+          description: Certificate successfully found and returned to the user.
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        "404":
+          description: Private Key could not be found.
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_certificates_csr
+  /saml-certificates/generate:
+    post:
+      tags:
+        - SAML Configuration
+      summary: Generate a new certificate to be provided to the user's SAML identity provider.
+      description: Generate a new certificate for the user's associated SAML Identity Provider. The certificate can be downloaded through the <code>/public</code> and <code>/csr</code> endpoints.
+      responses:
+        "204":
+          description: Certificate successfully generated.
+        "401":
+          description: The caller is not authenticated.
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        "500":
+          description: There was an error during certificate generation.
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_saml_certificates_generate
+  /saml-certificates/public:
+    get:
+      tags:
+        - SAML Configuration
+      summary: Download the certificate to provide to the the SAML identity provider.
+      description: Download the certificate file for the SAML Identity Provider associated with the authenticated User's Organization.
+      responses:
+        "200":
+          description: Certificate successfully found and returned to the user.
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        "404":
+          description: Certificate could not be found.
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_certificates_public
+  /saml-certificates/public/expiry:
+    get:
+      tags:
+        - SAML Configuration
+      summary: Fetch the expiry date of the currently generated certificate.
+      description: Fetch the expiry date for the certificate of the SAML Identity Provider associated with the authenticated User's Organization.
+      responses:
+        "200":
+          description: Certificate expiry date found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SamlServiceProviderCertificateExpiryDate"
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        "404":
+          description: SAML Identity Provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_certificates_public_expiry
+  /saml-identity-providers:
+    get:
+      tags:
+        - SAML Configuration
+      summary: "Get the SAML identity provider configured in the authenticated user's organization. "
+      description: Return the SAML IdPs that are visible to the authenticated user. Must specify an organization ID equality filter to see results. Will only ever see one result.
+      parameters:
+        - $ref: "#/components/parameters/samlFilterByOrganizationId"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesSamlIdentityProviders"
+      responses:
+        "200":
+          description: Successfully retrieved the SAML configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SamlIdentityProviderResources"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_identity_providers
+    post:
+      tags:
+        - SAML Configuration
+      summary: Configure a new SAML identity provider.
+      description: "Create the SAML Identity Provider. "
+      parameters:
+        - $ref: "#/components/parameters/includesSamlIdentityProviders"
+      requestBody:
+        $ref: "#/components/requestBodies/SamlIdentityProviderResource"
+      responses:
+        "200":
+          description: Successfully created the IdP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SamlIdentityProviderResource"
+        "403":
+          description: Insufficient permissions to create an IdP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, an Identity Provider with that entityId has already been registered for the organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_saml_identity_providers
+  /saml-identity-providers/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: SAML-identity-provider identifier
+        required: true
+        schema:
+          type: string
+          format: string
+    get:
+      tags:
+        - SAML Configuration
+      summary: Fetch the SAML identity provider by id.
+      description: If the authenticated user does not have permission to view the record for the given ID, the response will appear the same as querying  for a record that does not exist (404 Not Found).
+      parameters:
+        - $ref: "#/components/parameters/includesSamlIdentityProviders"
+      responses:
+        "200":
+          description: Successfully returned the SAML operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SamlIdentityProviderResource"
+        "404":
+          description: SAML Identity Provider not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_identity_providers_id
+    delete:
+      tags:
+        - SAML Configuration
+      summary: Delete the SAML identity provider.
+      description: Delete the SAML Identity Provider with the given id. If the authenticated user does not have permission to view the record for the given ID, the response will appear  the same as querying  for a record that does not exist (404 Not Found).
+      responses:
+        "200":
+          description: Successfully deleted the SAML configuration
+        "404":
+          description: SAML Identity Provider not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: delete_saml_identity_providers_id
+    patch:
+      tags:
+        - SAML Configuration
+      summary: Update the SAML identity provider.
+      description: Update the SAML Identity Provider. If the authenticated user does not have permission to view the record for the given ID, the response will appear  the same as querying  for a record that does not exist (404 Not Found).
+      parameters:
+        - $ref: "#/components/parameters/includesSamlIdentityProviders"
+      requestBody:
+        $ref: "#/components/requestBodies/SamlIdentityProviderResource"
+      responses:
+        "200":
+          description: Successfully updated the SAML configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SamlIdentityProviderResource"
+        "400":
+          description: Sorry, there was an error when registering the Identity Provider metadata. Please check that all data, including the certificate, are valid and well formed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Identity Provider not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, an Identity Provider with that entityId has already been registered for the organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: patch_saml_identity_providers_id
+  /saml-signature-algorithms:
+    get:
+      tags:
+        - SAML Configuration
+      summary: Get a list of all available hash algorithms for SAML configuration.
+      description: Read all available algorithms.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+      responses:
+        "200":
+          description: Successfully returned SAML signatures
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SamlSignatureHashAlgorithmList"
+        "401":
+          description: The caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedResponse"
+        "403":
+          description: Forbidden, when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_signature_algorithms
+  /saml/metadata:
+    get:
+      tags:
+        - SAML Configuration
+      summary: Download the SAML service provider metadata XML file for SAML configuration.
+      description: Read Service Provider Metadata XML file
+      responses:
+        "200":
+          description: Service Provider Metadata successfully generated.
+        "500":
+          description: Metadata cannot be generated. Possible configuration issue.
+          content:
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_saml_metadata
+  /terms-of-use:
+    get:
+      tags:
+        - Terms Of Use
+      summary: Get all of the Polaris terms of use.
+      description: Fetch all Terms of Use documents ordered by ID. This endpoint does not require authentication to access.
+      responses:
+        "200":
+          description: Successfully returned terms-of-use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermsOfUseResources"
+      operationId: get_terms_of_use
+  /terms-of-use/{id}:
+    get:
+      tags:
+        - Terms Of Use
+      summary: Fetch a specific terms of use by id. Use `latest` if you want the latest terms of use.
+      description: |-
+        Fetch a Terms of Use document. This endpoint does not require authentication to access.
+
+        If the exact ID of the document is known it should be provided: `/terms-of-use/$ID.`. This is case sensitive.
+
+        To fetch the latest document, use the latest mnemonic instead: `/terms-of-use/latest`. This is case sensitive.
+      parameters:
+        - name: id
+          in: path
+          description: Terms-of-use identifier
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully retrieved the terms-of-use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermsOfUseResource"
+        "404":
+          description: Terms-of-use document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_terms_of_use_id
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get all users.
+      description: Retrieve all of the users within the authenticated user's organization. The 'last-login-date' and 'access-token-last-used-date' attributes are fetched only for get user by single id as path parameter. The result can be filtered on a variety of properties outlined below.
+      parameters:
+        - $ref: "#/components/parameters/userFilterByNameEq"
+        - $ref: "#/components/parameters/userFilterByNameSubstr"
+        - $ref: "#/components/parameters/userFilterByNameIsubstr"
+        - $ref: "#/components/parameters/userFilterByEmailEq"
+        - $ref: "#/components/parameters/userFilterByEmailSubstr"
+        - $ref: "#/components/parameters/userFilterByEmailIsubstr"
+        - $ref: "#/components/parameters/userFilterByUsernameEq"
+        - $ref: "#/components/parameters/userFilterByUsernameSubstr"
+        - $ref: "#/components/parameters/userFilterByUsernameIsubstr"
+        - $ref: "#/components/parameters/userFilterByEnabled"
+        - $ref: "#/components/parameters/userFilterByFirstTime"
+        - $ref: "#/components/parameters/userFilterByAutomated"
+        - $ref: "#/components/parameters/userFilterByCurrent"
+        - $ref: "#/components/parameters/userFilterByReadProject"
+        - $ref: "#/components/parameters/userFilterByRoleAssignment"
+        - $ref: "#/components/parameters/userFilterByOrgAdmin"
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/includesUsers"
+      responses:
+        "200":
+          description: Successfully returned all users.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResources"
+        "400":
+          description: Invalid filter property or invalid filter value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permission to read Users or when page[limit] is less than 1 or greater than 500
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_users
+    post:
+      tags:
+        - Users
+      summary: Create a new user.
+      description: This endpoint is used to create regular users and automated users. In order to change a regular user to an automated user the `automated` flag must be enabled and a `ip-whitelist` and `password-login` must be provided in the update request. Once a user is set to automated they cannot be changed back to a regular user.
+      parameters:
+        - $ref: "#/components/parameters/includesUsers"
+      requestBody:
+        $ref: "#/components/requestBodies/UserResource"
+      responses:
+        "200":
+          description: Successfully created the user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResource"
+        "400":
+          description: Creation of an automated user was missing a password or ip-whitelist, or the creation of a regular user included an ip-whitelist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permission to create a new user or the creation of the new user would cause the seat count limit to be exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, that username or email address is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: post_users
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Fetch one or more users by id.
+      description: If the authenticated user does not have permission to view the Record for the given ID, the response will appear the same as querying  for a record that does not exist (404 Not Found).  The 'last-login-date' and 'access-token-last-used-date' attributes are fetched only for get user by single id.
+      parameters:
+        - name: id
+          in: path
+          description: User id, or comma-separated list of user ids.
+          required: true
+          schema:
+            type: string
+            format: string
+        - $ref: "#/components/parameters/includesUsers"
+      responses:
+        "200":
+          description: Successfully returned the user or users.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResource"
+        "404":
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: get_users_id
+    patch:
+      tags:
+        - Users
+      summary: Update a user.
+      description: "User information can be updated using this endpoint. This includes updating the name, email, username, and groups as well as enabling/disabling a user, flipping the first-time flag, and changing a regular user to an automated user. Note: In order to change a regular user to an automated user the `automated` flag must be enabled and a `ip-whitelist` and `password-login` must be provided in the update request. Once a user is set to automated they cannot be changed back to a regular user."
+      parameters:
+        - name: id
+          in: path
+          description: User id.
+          required: true
+          schema:
+            type: string
+            format: string
+        - $ref: "#/components/parameters/includesUsers"
+      requestBody:
+        $ref: "#/components/requestBodies/UserResource"
+      responses:
+        "200":
+          description: Successfully updated the user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResource"
+        "400":
+          description: "An automated user's password or ip-whitelist is missing, a regular user included an ip-whitelist, or user's password change request contained the incorrect old password. "
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions to update a user, enabling the user would cause the user count to exceed the seat count, or the sole organizationn owner cannot be disabled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Sorry, that username or email address is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      operationId: patch_users_id
+servers:
+  - url: https://visma.cop.blackduck.com/api/auth/v2
+components:
+  parameters:
+    pageLimit:
+      name: page[limit]
+      in: query
+      description: Used in paginating the response. Limits the number of resources returned. Should be >= 1 and <= 500.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 50
+    pageOffset:
+      name: page[offset]
+      in: query
+      description: Used in paginating the response. Requires the page[limit] parameter. Returns the page of resources given the limit provided.
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    includesApiTokens:
+      name: include[apitokens][]
+      in: query
+      description: Include the related resource.
+      required: false
+      schema:
+        type: string
+        enum:
+          - owner
+    includesGroups:
+      name: include[groups][]
+      in: query
+      description: Include the related resource.
+      required: false
+      schema:
+        type: string
+        enum:
+          - organization
+          - ancestors
+          - parent
+          - children
+          - users-count
+    includesLicenses:
+      name: include[licenses][]
+      in: query
+      description: Include the related resource.
+      required: false
+      schema:
+        type: string
+        enum:
+          - organization
+    includesOrganizations:
+      name: include[organizations][]
+      in: query
+      description: Include the related resource.
+      required: false
+      schema:
+        type: string
+        enum:
+          - owners
+          - users
+          - groups
+          - licenses
+          - activeLicenses
+          - licenseViolations
+    includesRoleAssignments:
+      name: include[role-assignments][]
+      in: query
+      description: Include the related resource.
+      required: false
+      schema:
+        type: string
+        enum:
+          - role
+          - user
+          - group
+    includesSamlIdentityProviders:
+      name: include[saml-identity-providers][]
+      in: query
+      description: Include the related resource.
+      required: false
+      schema:
+        type: string
+        enum:
+          - organization
+    includesUsers:
+      name: include[users][]
+      in: query
+      description: Include the related resource.  Notice, 'roleassignments' will be deprecated in future Api versions in favour of the 'organization-admin' field.
+      required: false
+      schema:
+        type: string
+        enum:
+          - organization
+          - groups
+          - roleassignments
+          - entitlements
+    organizationFilterByOrganizationName:
+      name: filter[organizations][organizationname][$eq]
+      in: query
+      description: Filter by organization name. Throws 404 if an organization by that name is not found.
+      required: false
+      schema:
+        type: string
+    entitlementsFilterByObject:
+      name: filter[entitlements][object][$eq]
+      in: query
+      description: |-
+        Requires an 'object' filter
+
+        e.g. `filter[entitlements][object][eq]=urn:x-swip:projects:project123` will find all entitlements for `project123` for the authenticated user.
+
+        Supported operations include [eq (equals), neq (not equals), substr (substring), isubstr (case-insensitive substring)]
+      required: false
+      schema:
+        type: string
+    entitlementsFilterOnBehalfOf:
+      name: filter[entitlements][on-behalf-of][$eq]
+      in: query
+      description: |-
+        To read entitlements for another user visible to you, you can use the 'on-behalf-of' filter:
+        e.g. `filter[entitlements][on-behalf-of][$eq]=some-user-id` will return entitlements for the user with id 'some-user-id' if and only if that user is visible to the caller.
+      required: false
+      schema:
+        type: string
+    roleAssignmentsFilterByKey:
+      name: filter[role-assignments][key][operator]
+      in: query
+      description: Filter the results based on the `key` with the given `operator`.
+      required: false
+      schema:
+        type: string
+    roleAssignmentsFilterByName:
+      name: filter[role-assignments][name][$eq]
+      in: query
+      description: Filter by role-assignment by the associated group, username or user full name.
+      required: false
+      schema:
+        type: string
+    groupsFilterByKey:
+      name: filter[groups][key][operator]
+      in: query
+      description: Filter the results based on the `key` with the given `operator`. All group filtering is case insensitive.
+      required: false
+      schema:
+        type: string
+    groupsFilterByName:
+      name: filter[groups][groupname][$eq]
+      in: query
+      description: Filter by group name.
+      required: false
+      schema:
+        type: string
+    licensesFilterByKey:
+      name: filter[licenses][key][operator]
+      in: query
+      description: Filter the results based on the `key` with the given `operator`.
+      required: false
+      schema:
+        type: string
+    licensesFilterByOrganizationId:
+      name: filter[licenses][organization][id][$eq]
+      in: query
+      description: Filter by organization id.
+      required: false
+      schema:
+        type: string
+    samlFilterByOrganizationId:
+      name: filter[saml-identity-providers][organization][id][$eq]
+      in: query
+      description: |-
+        Filter results by organization id.
+
+        E.g. filter[saml-identity-providers][organization][id][$eq]=organization123.
+      required: false
+      schema:
+        type: string
+    userFilterByNameEq:
+      name: filter[users][name][$eq]
+      in: query
+      description: Filter for users with a name equal to the filter value.
+      schema:
+        type: string
+    userFilterByNameSubstr:
+      name: filter[users][name][$substr]
+      in: query
+      description: Filter for users with a name that contains the filter value (case-sensitive)
+      schema:
+        type: string
+    userFilterByNameIsubstr:
+      name: filter[users][name][$isubstr]
+      in: query
+      description: Filter for users with a name that contains the filter value (case-insensitive)
+      schema:
+        type: string
+    userFilterByEmailEq:
+      name: filter[users][email][$eq]
+      in: query
+      description: Filter for users with an email equal to the filter value.
+      schema:
+        type: string
+    userFilterByEmailSubstr:
+      name: filter[users][email][$substr]
+      in: query
+      description: Filter for users with an email that contains the filter value (case-sensitive)
+      schema:
+        type: string
+    userFilterByEmailIsubstr:
+      name: filter[users][email][$isubstr]
+      in: query
+      description: Filter for users with an email that contains the filter value (case-insensitive)
+      schema:
+        type: string
+    userFilterByUsernameEq:
+      name: filter[users][username][$eq]
+      in: query
+      description: Filter for users with a username equal to the filter value.
+      schema:
+        type: string
+    userFilterByUsernameSubstr:
+      name: filter[users][username][$substr]
+      in: query
+      description: Filter for users with a username that contains the filter value (case-sensitive)
+      schema:
+        type: string
+    userFilterByUsernameIsubstr:
+      name: filter[users][username][$isubstr]
+      in: query
+      description: Filter for users with a username that contains the filter value (case-insensitive)
+      schema:
+        type: string
+    userFilterByEnabled:
+      name: filter[users][enabled][$eq]
+      in: query
+      description: If true, return all enabled users, else return all disabled users.
+      schema:
+        type: boolean
+    userFilterByFirstTime:
+      name: filter[users][firstTime][$eq]
+      in: query
+      description: If true, return all first-time users, else return all non-first-time users.
+      schema:
+        type: boolean
+    userFilterByAutomated:
+      name: filter[users][automated][$eq]
+      in: query
+      description: "If true, return all automated users, else return all non-automated users. Note: not providing this filter is the same as setting the filter value to false."
+      schema:
+        type: boolean
+    userFilterByCurrent:
+      name: filter[users][current][$eq]
+      in: query
+      description: If true, returns the current user.
+      schema:
+        type: boolean
+    userFilterByReadProject:
+      name: filter[users][read-project][$eq]
+      in: query
+      description: Filter on users that have access to the given project.
+      schema:
+        type: string
+    userFilterByRoleAssignment:
+      name: filter[users][role-assignment][$eq]
+      in: query
+      description: Filter on users with that have ann explicit role-assignment for the given project.
+      schema:
+        type: string
+    userFilterByOrgAdmin:
+      name: filter[users][organization-admin][$eq]
+      in: query
+      description: Filter on users that have an organization admin role-assignment.
+      schema:
+        type: string
+    roleFilterByAssignableLevels:
+      name: filter[roles][assignableLevels][$eq]
+      in: query
+      description: Filter on roles that have the given assignableLevel.
+      schema:
+        type: string
+  requestBodies:
+    UserResource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/UserResource"
+      description: UserResource
+    GroupResource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GroupResource"
+      description: GroupResource
+    OrganizationResource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OrganizationResource"
+      description: OrganizationResource
+    SamlIdentityProviderResource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SamlIdentityProviderResource"
+      description: SamlIdentityProviderResource
+  schemas:
+    apitokens:
+      description: Container for an APIToken
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/APIToken_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+            relationships:
+              $ref: "#/components/schemas/APIToken_relationships"
+    APITokenResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/apitokens"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for an APIToken
+    APITokenResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/apitokens"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for APITokens
+    APIToken_attributes:
+      type: object
+      description: The attributes that define an API-Token
+      properties:
+        access-token:
+          type: string
+          description: The access-token is a unique string generated by combining a Java UUID and 16 byte SecureRandom value. The user is expected to securely store this string as they cannot be retrieved from the Polaris API. It is provided only when a new API Token is generated.
+          example: slpn3fc7 ... hjc67vhr0
+        date-created:
+          type: string
+          format: date-time
+          example: 2020-05-14T12:44:55+0000
+          description: The date-time the token was created at.
+        jwt:
+          type: string
+          description: The jwt attribute of the token in the response may be used as a bearer token for future requests.
+          example: eyJraWQiOiJv ... YifQ.eyJqdGkiOiJuN2pJ ... GkvYXV
+        name:
+          type: string
+          description: name attribute is used to identify the API Token
+          example: token-for-jenkins-build-1.9.12
+        revoked:
+          type: boolean
+          description: Indicates if the token has been revoked
+    APIToken_relationships:
+      type: object
+      description: |
+        Relationships for APIToken
+         - `owner` is the owner(user) of the API Token
+      required:
+        - owner
+      properties:
+        owner:
+          $ref: "#/components/schemas/ToOneRelationship"
+    AuthenticateSuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        jwt:
+          type: string
+          description: The jwt attribute of the token in the response may be used as a bearer token for future requests.
+          example: eyJraWQiOiJv ... YifQ.eyJqdGkiOiJuN2pJ ... GkvYXV
+    contexts:
+      description: contexts
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/Context_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+    ContextResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/contexts"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+    ContextResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/contexts"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+      description: Resource container for Context
+    Context_attributes:
+      type: object
+      required:
+        - current
+        - organizationname
+        - username
+      properties:
+        current:
+          type: boolean
+          description: Indicates if the context retrieved is for the  currently authenticated user
+        organizationname:
+          type: string
+          description: Returns the name of the organization the current context is associated with
+          example: Example Inc.
+        username:
+          type: string
+          description: Returns the name of the user for the current context
+          example: Foo Bar
+      description: Attributes for Context
+    entitlements:
+      description: entitlements
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/Entitlement_attributes"
+            id:
+              type: string
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+    EntitlementResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/entitlements"
+      description: Resource container for Entitlement
+    EntitlementResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/entitlements"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+      description: Resource container for Entitlement
+    Entitlement_attributes:
+      type: object
+      required:
+        - allowed
+      properties:
+        allowed:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permissions"
+      description: Attributes for Entitlement
+    EntityTag:
+      type: object
+      properties:
+        value:
+          type: string
+        weak:
+          type: boolean
+    ErrorResponse:
+      type: object
+      properties:
+        errors:
+          $ref: "#/components/schemas/IterableErrorData"
+    groups:
+      description: groups
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+            - relationships
+          properties:
+            attributes:
+              $ref: "#/components/schemas/Group_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+            relationships:
+              $ref: "#/components/schemas/Group_relationships"
+    GroupResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/groups"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for Group
+    GroupResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/groups"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for Group
+    Group_attributes:
+      type: object
+      required:
+        - date-created
+        - groupname
+      properties:
+        date-created:
+          type: string
+          format: date-time
+          description: Creation date of the group
+        groupname:
+          type: string
+          description: The name of the group
+          example: Engineering
+      description: Attributes for Group
+    Group_relationships:
+      type: object
+      required:
+        - organization
+        - ancestors
+      properties:
+        ancestors:
+          $ref: "#/components/schemas/ToManyRelationship"
+        children:
+          $ref: "#/components/schemas/ToManyRelationship"
+        organization:
+          $ref: "#/components/schemas/ToOneRelationship"
+        parent:
+          $ref: "#/components/schemas/ToOneRelationship"
+        users-count:
+          $ref: "#/components/schemas/ToOneRelationship"
+      description: Relationships for Group
+    IterableErrorData:
+      type: array
+      items:
+        $ref: "#/components/schemas/ErrorData"
+    ErrorData:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 460ffbbf-8c4f-448a-88b5-098c65adc6d7
+          description: Error identifier (UUID) if it is provided
+        status:
+          type: string
+          example: FORBIDDEN
+          description: State of the current request
+        code:
+          type: string
+          example: "403"
+          description: Error code corresponding to the error status
+        title:
+          type: string
+          example: Access Denied
+          description: Short description of the error condition
+        detail:
+          type: string
+          example: Access to the specified resource is not allowed
+          description: Brief description for the cause of the error
+        meta:
+          type: object
+          properties:
+            entity:
+              type: string
+              example: Projects
+      required:
+        - status
+        - title
+        - code
+        - detail
+    License:
+      description: license data for the application/json media type
+      type: object
+      required:
+        - claimed-date
+        - issued-by
+        - issued-to
+        - limits
+        - name
+        - revoked
+        - seat-count
+        - type
+      properties:
+        id:
+          type: string
+          description: Indicates the license identifier
+          example: abcey12ef
+        claimed-date:
+          type: string
+          format: date-time
+          description: Indicates the date-time the license was claimed
+        name:
+          type: string
+          minLength: 0
+          maxLength: 256
+          description: Indicates the license name
+          example: Example Inc. License
+        issued-date:
+          type: string
+          format: date-time
+          description: Indicates the issue date for the license
+        issued-to:
+          type: string
+          description: Indicates the issuing organization name
+          example: Example Inc.
+        issued-by:
+          type: string
+          description: Indicates the issuing organization/issuer
+          example: Black Duck Software, Inc.
+        seat-count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Indicates the number of active users that can be created
+          example: 100
+        type:
+          type: string
+          enum:
+            - PAID
+            - FREE
+        limits:
+          type: object
+          properties:
+            RESULTS:
+              $ref: "#/components/schemas/PeriodOfUse"
+            RETENTION:
+              $ref: "#/components/schemas/PeriodOfUse"
+    LicenseMeta:
+      description: Metadata for the corresponding license.
+      type: object
+      properties:
+        organization-id:
+          type: string
+          description: Indicates the organization(id) to which the licence was issue to
+          example: slpn3fc7o95ed46f2746kkm78k
+        revoked:
+          type: boolean
+          description: Indicates if the license was revoked
+        claimed-date:
+          type: string
+          format: date-time
+          description: Indicates the date-time the license was claimed
+        revoked-date:
+          type: string
+          format: date-time
+          description: Indicates the date-time the license was revoked
+    LicenseRequest:
+      description: license request for the application/json media type
+      type: object
+      properties:
+        license:
+          $ref: "#/components/schemas/License"
+        signatureInfo:
+          $ref: "#/components/schemas/SignatureInfo"
+    LicenseResponse:
+      description: license response for the application/json media type
+      type: object
+      properties:
+        id:
+          type: string
+        license:
+          $ref: "#/components/schemas/License"
+        signatureInfo:
+          $ref: "#/components/schemas/SignatureInfo"
+        meta:
+          $ref: "#/components/schemas/LicenseMeta"
+    LicenseListResponse:
+      description: licenses response for the application/json media type
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        licenses:
+          type: array
+          readOnly: true
+          items:
+            $ref: "#/components/schemas/LicenseResponse"
+    LicenseAlreadyImportedResponse:
+      type: object
+      properties:
+        message:
+          type: string
+    licenses:
+      description: license data for the application/json media type
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+            - relationships
+          properties:
+            attributes:
+              $ref: "#/components/schemas/LicenseJsonApi_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+            relationships:
+              $ref: "#/components/schemas/LicenseJsonApi_relationships"
+    LicenseJsonApiResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/licenses"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for licenses
+    LicenseJsonApiResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/licenses"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for licenses
+    LicenseJsonApi_attributes:
+      type: object
+      required:
+        - claimed-date
+        - issued-by
+        - issued-to
+        - limits
+        - name
+        - revoked
+        - seat-count
+        - type
+      properties:
+        claimed-date:
+          type: string
+          format: date-time
+          description: Indicates the date-time the license was claimed
+        issued-by:
+          type: string
+          description: Indicates the issuing organization/issuer
+          example: Black Duck Software, Inc.
+        issued-date:
+          type: string
+          format: date-time
+          description: Indicates the issue date for the license
+        issued-to:
+          type: string
+          description: Indicates the issuing organization name
+          example: Example Inc.
+        limits:
+          type: object
+          properties:
+            RESULTS:
+              $ref: "#/components/schemas/PeriodOfUse"
+            RETENTION:
+              $ref: "#/components/schemas/PeriodOfUse"
+        name:
+          type: string
+          description: Indicates the license name
+          example: Example Inc. License
+        revoked:
+          type: boolean
+          description: Indicates the license revocation status
+        revoked-date:
+          type: string
+          format: date-time
+          description: Indicates the license revocation date-time if applicable
+        seat-count:
+          type: integer
+          format: int32
+          description: Indicates the number of active users that can be created
+          example: 100
+        type:
+          type: string
+          enum:
+            - PAID
+            - FREE
+      description: Attributes for licenses
+    LicenseJsonApi_relationships:
+      type: object
+      required:
+        - organization
+      properties:
+        organization:
+          $ref: "#/components/schemas/ToOneRelationship"
+      description: Relationships for LicenseJsonApi
+    license-violation:
+      description: licenses
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/LicenseViolation_attributes"
+    LicenseViolation_attributes:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+      description: Attributes for license-violation
+    Link:
+      type: object
+      properties:
+        title:
+          type: string
+        rel:
+          type: string
+        uriBuilder:
+          $ref: "#/components/schemas/UriBuilder"
+        rels:
+          type: array
+          items:
+            type: string
+        type:
+          type: string
+        uri:
+          type: string
+          format: uri
+        params:
+          type: object
+          additionalProperties:
+            type: string
+    Locale:
+      type: object
+      properties:
+        language:
+          type: string
+        script:
+          type: string
+        country:
+          type: string
+        variant:
+          type: string
+        extensionKeys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        unicodeLocaleAttributes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        unicodeLocaleKeys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        iso3Language:
+          type: string
+        iso3Country:
+          type: string
+        displayLanguage:
+          type: string
+        displayScript:
+          type: string
+        displayCountry:
+          type: string
+        displayVariant:
+          type: string
+        displayName:
+          type: string
+    MediaType:
+      type: object
+      properties:
+        type:
+          type: string
+        subtype:
+          type: string
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+        wildcardType:
+          type: boolean
+        wildcardSubtype:
+          type: boolean
+    NewCookie:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        version:
+          type: integer
+          format: int32
+        path:
+          type: string
+        domain:
+          type: string
+        comment:
+          type: string
+        maxAge:
+          type: integer
+          format: int32
+        expiry:
+          type: string
+          format: date-time
+        secure:
+          type: boolean
+        httpOnly:
+          type: boolean
+    OAuthTokenResponse:
+      type: object
+      required:
+        - accessToken
+        - tokenType
+      properties:
+        access_token:
+          type: string
+          readOnly: true
+          example: eyJraWQiOiJv ... YifQ.eyJqdGkiOiJuN2pJ ... GkvYXV
+          description: The access token generated for the impersonated user
+        token_type:
+          type: string
+          readOnly: true
+          example: bearer
+          description: The access token type usually 'bearer'
+        expires_in:
+          type: integer
+          format: int64
+          readOnly: true
+          example: 3600
+          description: The time in seconds when the token expires in
+        refresh_token:
+          type: string
+          readOnly: true
+          example: eyJraWQiOiJv ... YifQ.eyJqdGkiOiJuN2pJ ... GkvYXV
+          description: The token to use for refreshing the session
+        scope:
+          type: string
+          readOnly: true
+          example: projects.read
+          description: Indicates the allowed permissions for the impersonate user
+        user_id:
+          type: string
+          readOnly: true
+          example: eyJraWQiOiJv
+          description: Indicates the user-id of the impersonated user
+    ObjectContainer:
+      type: object
+      required:
+        - type
+        - id
+      discriminator:
+        propertyName: type
+      properties:
+        type:
+          type: string
+          example: <resource-name>
+          description: Indicates the type of the resource that is being managed. It takes one of the values in the enum as applicable. Valid values are {'apitokens','users', 'entitlements', 'role-assignments', 'roles', 'groups', 'licences', 'organizations', 'terms-of-use', 'contexts', 'saml-identity-providers'}
+        id:
+          type: string
+          description: The JSON-API representation of an resource. The `id` field is a base32 encoded UUID
+          example: slpn3fc7o95ed46f2746kkm78k
+    ObjectContainers:
+      type: array
+      items:
+        $ref: "#/components/schemas/ObjectContainer"
+    organizations:
+      description: The JSON-API representation of an Organization. The `id` field is a base32 encoded UUID and the `type` field is the string literal 'organizations'.
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/Organization_attributes"
+            relationships:
+              $ref: "#/components/schemas/Organization_relationships"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+    OrganizationResource:
+      type: object
+      description: Resource container for a single organization.
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/organizations"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+    OrganizationResources:
+      type: object
+      description: Resource container for a list of organizations.
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/organizations"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+    Organization_attributes:
+      type: object
+      description: The attributes that define an organization.
+      required:
+        - description
+        - organizationname
+        - password-authentication
+      properties:
+        date-created:
+          type: string
+          format: date-time
+          readOnly: true
+          description: The date the organization was created. This is set by the server.
+        description:
+          type: string
+          description: |
+            The description for an organization. It must be between 1 and 512 characters in length. Often used to display the human-readable name of an organization. For example, description=Black Duck Software, Inc.
+          example: SAST tooling for Black Duck Software, Inc.
+        organizationname:
+          type: string
+          description: |
+            A short identifier for an organization. Can only contain alphanumeric characters and no dashes and must be between 1 and 53 characters in length. For example, organizationname=blackduck.
+          example: BlackDuck
+        password-authentication:
+          $ref: "#/components/schemas/PasswordAuthentication"
+        soft-deleted:
+          type: boolean
+          default: false
+          description: |
+            This flag indicates if the organization is soft-deleted. This should always return false since soft-deleting an organization prevents users from authenticating into it.
+    Organization_relationships:
+      type: object
+      description: |
+        The relationships that exist for an organization.
+          - `activeLicense` is the current active license for the organization
+          - `groups` is a list of groups within the organization
+          - `licenseViolations` is a list of license violations for the current active license
+          - `licenses` is a list of all licenses for an organization; active or inactve
+          - `owners` is a list of users that are the organization owners
+          - `role-assignments` is a list of role-assignments within the organization
+          - `users` is a list of all users within the organization
+      required:
+        - owners
+      properties:
+        activeLicense:
+          $ref: "#/components/schemas/ToOneRelationship"
+        groups:
+          $ref: "#/components/schemas/ToManyRelationship"
+        licenseViolations:
+          $ref: "#/components/schemas/ToManyRelationship"
+        licenses:
+          $ref: "#/components/schemas/ToManyRelationship"
+        owners:
+          $ref: "#/components/schemas/ToManyRelationship"
+        role-assignments:
+          $ref: "#/components/schemas/ToManyRelationship"
+        users:
+          $ref: "#/components/schemas/ToManyRelationship"
+    PagedMeta:
+      type: object
+      properties:
+        limit:
+          type: integer
+          format: int32
+          readOnly: true
+        offset:
+          type: integer
+          format: int32
+          readOnly: true
+        total:
+          type: integer
+          format: int64
+          readOnly: true
+    PasswordAuthentication:
+      type: object
+      description: This Authentication Provider is used to configure email/password based authentication.
+      required:
+        - enabled
+        - allowSelfSignup
+      properties:
+        enabled:
+          type: boolean
+          default: true
+          description: When true, this will allow Users to authenticate using email/password.
+        allowSelfSignup:
+          type: boolean
+          default: false
+          description: This flag is required, but is not consumed by the server.
+    passwordlogins:
+      description: Password login details
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/PasswordLogin_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+    PasswordLogin_attributes:
+      type: object
+      required:
+        - email
+        - email-verified
+      properties:
+        email:
+          type: string
+          format: email
+        email-verified:
+          type: boolean
+      description: Attributes for PasswordLogin
+    PasswordLoginResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/passwordlogins"
+      description: Resource container for PasswordLogin
+    PathIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+    PeriodOfUse:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          readOnly: true
+        end:
+          type: string
+          format: date-time
+          readOnly: true
+    Permissions:
+      type: string
+      description: These are the top-level permissions allowed on the specified resources. The permission strings are usually formatted as <resource-name>.<operation>
+      enum:
+        - administer
+        - users.read
+        - users.readPrivate
+        - users.write
+        - groups.read
+        - groups.write
+        - projects.create
+        - projects.read
+        - projects.write
+        - jira.integrations.config.write
+        - jira.integrations.config.read
+        - jira.project.write
+        - jira.project.read
+        - jira.issues.write
+        - jira.issues.read
+        - applications.read
+        - applications.create
+        - role.assignments.write
+    PermissionsForApplication:
+      type: string
+      description: The permissions allowed in the Application context. The permission strings are usually formatted as <resource-name>.<operation>
+      enum:
+        - applications.read
+        - administer
+        - role.assignments.write
+    PermissionsForOrganization:
+      type: string
+      description: The permissions allowed in the Organization context. The permission strings are usually formatted as <resource-name>.<operation>
+      enum:
+        - administer
+        - users.read
+        - users.readPrivate
+        - users.write
+        - groups.read
+        - groups.write
+        - projects.create
+        - jira.integrations.config.write
+        - jira.integrations.config.read
+        - jira.project.write
+        - jira.project.read
+        - jira.issues.write
+        - jira.issues.read
+        - applications.create
+        - role.assignments.write
+        - applications.read
+    PermissionsForProject:
+      type: string
+      description: The permissions allowed in the Project context. The permission strings are usually formatted as <resource-name>.<operation>
+      enum:
+        - administer
+        - projects.read
+        - projects.write
+        - jira.integrations.config.read
+        - jira.project.write
+        - jira.project.read
+        - jira.issues.write
+        - jira.issues.read
+        - role.assignments.write
+    RedirectToOAuthResponse:
+      type: object
+      properties:
+        redirect_uri:
+          type: string
+          format: uri
+          example: https://idp.example.com
+          readOnly: true
+    RelationshipLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri
+          description: Link to the related resource's type and id information. ex. if access-token is a resource, then related resource is a user. This link will fetch {type,id} of the the related resource.
+          example: https://{host}/{basePath}/{resourcePath}/{id}/relationships/{related-resource-name}
+        related:
+          type: string
+          format: uri
+          description: Link to fetch the related resource-instance details specified within the RelationshipLinks.'self' URI. ex. if access-token resource instance is {abc} and related resource instance is {def}, then this link will fetch details of the resource {def}
+          example: https://{host}/{basePath}/{resourcePath}/{id}/related/{related-resource-name}
+    ResourceLinks:
+      type: object
+      properties:
+        self:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+              description: Link to the current resource-instance specified by the {id}
+              example: https://{host}/{basePath}/{resourcePath}/{id}
+            meta:
+              type: object
+              properties:
+                durable:
+                  type: string
+                  format: uri
+                  description: The current resource-instance specified as an URN
+                  example: urn:x-swip:{resource-name}:{resource-id}
+    ResourcesPagination:
+      type: object
+      properties:
+        offset:
+          type: number
+          description: The offset used for this request.  If null, no offset was applied.
+          example: 2
+        limit:
+          type: number
+          description: The maximum number of elements returned for this request.  If null, no limit was applied.
+          example: 50
+        total:
+          type: number
+          description: The total number of results matching the provided criteria, without regard to the provided offset or limit.
+          example: 100
+    Response:
+      type: object
+      properties:
+        cookies:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/NewCookie"
+        lastModified:
+          type: string
+          format: date-time
+        date:
+          type: string
+          format: date-time
+        headers:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+        length:
+          type: integer
+          format: int32
+        language:
+          $ref: "#/components/schemas/Locale"
+        location:
+          type: string
+          format: uri
+        links:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Link"
+        metadata:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+        entity:
+          type: object
+        status:
+          type: integer
+          format: int32
+        statusInfo:
+          $ref: "#/components/schemas/StatusType"
+        mediaType:
+          $ref: "#/components/schemas/MediaType"
+        allowedMethods:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        entityTag:
+          $ref: "#/components/schemas/EntityTag"
+        stringHeaders:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    roles:
+      description: roles
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/Role_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+    role-assignments:
+      description: role-assignments
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+            - relationships
+          properties:
+            attributes:
+              $ref: "#/components/schemas/RoleAssignment_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+            relationships:
+              $ref: "#/components/schemas/RoleAssignment_relationships"
+    RoleAssignmentResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/role-assignments"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for RoleAssignment
+    RoleAssignmentResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/role-assignments"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for RoleAssignment
+    RoleAssignment_attributes:
+      type: object
+      required:
+        - object
+      properties:
+        expires-by:
+          type: string
+          format: date-time
+        object:
+          type: string
+          format: URN
+          example: urn:x-swip:projects:e35264d0-8d07-4502-a149-03632f5ba3e6
+      description: Attributes for RoleAssignment
+    RoleAssignment_relationships:
+      type: object
+      required:
+        - organization
+        - role
+      properties:
+        group:
+          $ref: "#/components/schemas/ToOneRelationship"
+        organization:
+          $ref: "#/components/schemas/ToOneRelationship"
+        role:
+          $ref: "#/components/schemas/ToOneRelationship"
+        user:
+          $ref: "#/components/schemas/ToOneRelationship"
+      description: Relationships for RoleAssignment
+    RoleResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/roles"
+      description: Resource container for Role
+    RoleResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/roles"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+      description: Resource container for Role
+    Role_attributes:
+      type: object
+      required:
+        - permissions
+        - rolename
+        - assignableLevels
+      properties:
+        permissions:
+          type: object
+          properties:
+            APPLICATION:
+              type: array
+              readOnly: true
+              items:
+                $ref: "#/components/schemas/PermissionsForApplication"
+            ORGANIZATION:
+              type: array
+              readOnly: true
+              items:
+                $ref: "#/components/schemas/PermissionsForOrganization"
+            PROJECT:
+              type: array
+              readOnly: true
+              items:
+                $ref: "#/components/schemas/PermissionsForProject"
+        rolename:
+          type: string
+          enum:
+            - Observer
+            - Contributor
+            - ApplicationManager
+            - Administrator
+        assignableLevels:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - ORGANIZATION
+              - APPLICATION
+              - PROJECT
+      description: Attributes for Role
+    saml-identity-providers:
+      description: saml-identity-providers
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+            - relationships
+          properties:
+            attributes:
+              $ref: "#/components/schemas/SamlIdentityProvider_attributes"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+            relationships:
+              $ref: "#/components/schemas/SamlIdentityProvider_relationships"
+    SamlIdentityProviderResource:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/saml-identity-providers"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for SamlIdentityProvider
+    SamlIdentityProviderResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/saml-identity-providers"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+      description: Resource container for SamlIdentityProvider
+    SamlIdentityProvider_attributes:
+      type: object
+      required:
+        - enable-group-inheritance
+        - entity-id
+        - saml-email-domains
+        - signature-algorithm
+        - slo-url
+        - sso-url
+        - x509-cert-base64
+      properties:
+        enable-group-inheritance:
+          type: boolean
+          default: true
+          description: Enable user group inheritance from the SAML Identity Provider. If disabled, management of user group
+        entity-id:
+          type: string
+          description: An unique name for the identity provider
+          example: https://okta.blackduck.com
+        saml-email-domains:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: email
+          description: unique set of email-domain configurations that are used to determine the identity providers (IdP)
+          example: engineering.blackduck.com
+        signature-algorithm:
+          type: string
+          example: SHA256
+          description: The algorithm used to sign the SAML response
+        slo-url:
+          type: string
+          example: https://okta.blackduck.com/signout
+          description: The URL to redirect the client to for logging out of the session
+        sso-url:
+          type: string
+          example: https://okta.blackduck.com/saml
+          description: The URL to redirect the client to for logging in/authentication
+        x509-cert-base64:
+          type: string
+          description: Public certificate provided by the IdP required to decode SAML responses
+          example: ""
+      description: Attributes for SamlIdentityProvider
+    SamlIdentityProvider_relationships:
+      type: object
+      required:
+        - organization
+      properties:
+        organization:
+          $ref: "#/components/schemas/ToOneRelationship"
+      description: Relationships for SamlIdentityProvider
+    SamlServiceProviderCertificateExpiryDate:
+      type: object
+      properties:
+        expiry-date:
+          type: string
+          format: date-time
+          readOnly: true
+    SamlSignatureHashAlgorithmList:
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        algorithms:
+          type: array
+          readOnly: true
+          items:
+            type: string
+            enum:
+              - SHA1
+              - SHA256
+              - SHA512
+    SetPassword:
+      type: object
+      description: SetPassword can be provided as part of a POST or PATCH requests to the users API. If used for creation only the `password` field needs to be included, but if used for updating the `password` and `oldPassword` fields need to be provided and the `oldPassword` field must match the exsiting user's current password.
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          description: The new password for the user.
+        oldPassword:
+          type: string
+          description: The old password for the user. Must match what the server knows to be the old password in order to update the password.
+    SignatureInfo:
+      description: The signature details for a signed request or response.
+      type: object
+      properties:
+        key-id:
+          description: The id of the key used to sign the license.
+          type: string
+        algorithm:
+          description: The name of the signing algorithm. See https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Signature
+          type: string
+          example: SHA1withDSA
+        signature:
+          description: The digital signature of the license.
+          type: string
+          example: 5439ebff121296a3591bf9c97e3705cc88f5bffd
+    StatusType:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        reasonPhrase:
+          type: string
+        family:
+          type: string
+          enum:
+            - INFORMATIONAL
+            - SUCCESSFUL
+            - REDIRECTION
+            - CLIENT_ERROR
+            - SERVER_ERROR
+            - OTHER
+    terms-of-use:
+      description: terms-of-use
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/TermsOfUse_attributes"
+            id:
+              type: string
+    TermsOfUseResource:
+      type: object
+      description: Resource container for TermsOfUse
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/terms-of-use"
+    TermsOfUseResources:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/terms-of-use"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+      description: Resource container for TermsOfUse
+    TermsOfUse_attributes:
+      type: object
+      description: Attributes for TermsOfUse
+      properties:
+        sha256:
+          type: string
+          description: base 64 encoded byte array
+          example: c875804333b117a43cc582d9635e64 ...
+        text:
+          type: string
+          example: |-
+            Terms of Service
+             Release 2020.05 ...
+    ToManyRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/RelationshipLinks"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectContainer"
+    ToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/RelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ObjectContainer"
+    UriBuilder:
+      type: object
+    users:
+      description: The JSON-API representation of a User. The `id` field is a base32 encoded UUID and the `type` field is the string literal 'users'.
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+            - relationships
+          properties:
+            attributes:
+              $ref: "#/components/schemas/User_attributes"
+            relationships:
+              $ref: "#/components/schemas/User_relationships"
+            links:
+              $ref: "#/components/schemas/ResourceLinks"
+    UserResource:
+      type: object
+      description: Resource container for a single user.
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/users"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+    UserResources:
+      type: object
+      description: Resource container for a list of users.
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/users"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          $ref: "#/components/schemas/ObjectContainers"
+    User_attributes:
+      type: object
+      description: The attributes that define a user.
+      required:
+        - automated
+        - email
+        - enabled
+        - first-time
+        - name
+        - system
+        - username
+        - organization-admin
+      properties:
+        agreed-to-terms:
+          type: boolean
+          readOnly: true
+          description: This flag indicates whether or not the user has agreed to the Polaris terms of use. Cannot be used for filtering.
+        agreedTermsOfUse:
+          type: array
+          readOnly: true
+          uniqueItems: true
+          description: The list of terms of use the user has agreed to. The list contains the id and hash of the terms of use document.
+          items:
+            type: object
+        date-created:
+          type: string
+          format: date-time
+          readOnly: true
+          description: The date the user was created. This is set by the server.
+        email:
+          type: string
+          description: The email address of the user. Must be between 3 and 256 characters in length.
+        enabled:
+          type: boolean
+          description: This flag indicates whether or not the user is enabled.
+        first-time:
+          type: boolean
+          description: This flag indicates whether or not the user is using the platform for the first time. This is set to `true` upon user creation.
+        name:
+          type: string
+          description: The name of the user. Must not be longer than 256 characters.
+        owner:
+          type: boolean
+          description: This flag indicates whether or not the user is an owner of their organization.
+        password-login:
+          $ref: "#/components/schemas/SetPassword"
+        system:
+          type: boolean
+          description: This flag indicates whether or not the user is a system user. This should always be `false` as system users are not visible within regular organizations. Cannot be used for filtering.
+        username:
+          type: string
+          description: The username of the user. Must contain only alphanumeric character, must not start with a dash, and must not be longer than 256 characters.
+        organization-admin:
+          type: boolean
+          description: This flag indicates if the user has a direct and not expired organization-admin role assignment. Cannot be used for filtering.
+        automated:
+          type: boolean
+          description: This flag indicates whether or not the user is automated. If this is set to true, `password-login` and `ip-whitelist` must be provided.
+        ip-whitelist:
+          type: array
+          uniqueItems: true
+          description: The list of IP addresses that a user can access Polaris from. This is only for automated users as a second authentication factor.
+          items:
+            type: string
+        last-login-date:
+          type: string
+          format: date-time
+          readOnly: true
+          description: The timestamp of the last successful authentication of the user using local (email/password combination), two-factor or SAML methods (either through UI or API).
+        access-token-last-used-date:
+          type: string
+          format: date-time
+          readOnly: true
+          description: The timestamp of the last successful authentication of the user using the access token.
+    User_relationships:
+      type: object
+      description: |
+        The relationships that exist for a user.
+         - `email-details` tracks the current email and password combination used to authenticate with polaris. This functionality is for multi-org users.
+         - `entitlements` is the entitlements for the user on their organization. This contains different data for Administrators, Contributors, and Observers inn the context of the organization.
+         - `groups` is a list of groups that the user is a member of. This is read-only, in order to add/remove users to/from groups you must use the Groups API.
+         - `organization` is the organization the user exists within.
+         - `roleassignments` is a list of all role-assignments for the user. This will be deprecated in future Api version in favour of the `organization-admin` field.
+      required:
+        - organization
+      properties:
+        email-details:
+          $ref: "#/components/schemas/ToOneRelationship"
+        entitlements:
+          $ref: "#/components/schemas/ToOneRelationship"
+        groups:
+          $ref: "#/components/schemas/ToManyRelationship"
+        organization:
+          $ref: "#/components/schemas/ToOneRelationship"
+        roleassignments:
+          $ref: "#/components/schemas/ToManyRelationship"
+    users-count:
+      description: UsersCount query object (non-persistent).
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/UsersCount_attributes"
+    UsersCount_attributes:
+      type: object
+      required:
+        - value
+      properties:
+        value:
+          type: integer
+      description: Attributes for UsersCount
+    UnauthorizedResponse:
+      type: string
+      example: Credentials are required to access the resource

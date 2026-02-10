@@ -1,0 +1,3800 @@
+openapi: 3.0.0
+info:
+  version: 0.0.0
+  title: Common Object Service - Navigation
+  description: |
+    
+    ## Description:
+
+    The Common Object Service manages the hierarchy of software life cycle objects that are common across analytical tools. The API allows to query (and in some cases, manipulate) the following:
+      * Information about the tools available to an organization.
+      * Information about projects, branches, revisions, and runs the user has permission to view.
+
+
+    ## Resources
+
+    ### Tool
+
+    A tool is a producer of issue data that is consumed by Polaris. E.g. 'Coverity 2020.03'.
+
+    ### Application
+
+    An application is an aggreagate of multiple projects that together make up an Application.
+
+    ### Project
+
+    Represents a single software product. Most often, a project is represented by a single top-level directory that contains source code and artifacts.
+
+    ### Branch
+
+    A branch is the same concept as a branch in source control systems, representing a set of files derived from a known starting point.
+
+    ### Revision
+
+    A revision is a snapshot of the project branch at a particular moment in time.
+
+    ### Run
+
+    A run is a single execution of a tool.
+
+    ### Run Properties
+
+    A run has zero or more run properties, which are attributes of the run.
+
+    ### Project Preferences
+
+    A user's personal setting that affects how a project's data is displayed to them in the Polaris user interface.
+
+    ## Additional API notes
+
+    ### Updates via PATCH requests
+
+    Attributes and relationships of resources can be updated by sending PATCH requests.
+    The payload of a PATCH request is the resource object with all attributes and relationships specified ( including the `type` but `id` is not mandatory).
+    Every PATCH request must be accompanied with the latest ETag of the resource. ETags are explained in the following section.
+
+    ### ETags
+
+    Unless otherwise noted, all update requests (i.e. requests with the PATCH method) require the most recent ETag value to be specified in the `If-Match` HTTP
+    header. This ensures the update is not applied to a stale view of the resource. Every update to a resource will also update the ETag.
+    The ETag value for a resource can be found in the `meta` section of a resource.
+
+
+    E.g. `If-Match: W/\"bfi8lc[...]7ekgg\"`
+
+
+    When the `If-Match` header is not supplied, or an outdated ETag value is supplied, the request will fail with HTTP status `412 Precondition Failed`. The request
+    can be retried by fetching the latest representation of a resource and re-issuing with the latest ETag value.
+
+    ### Objects in trash
+
+    Most objects in the Common Object Service are not physically deleted, just marked as `in-trash`.
+
+    Deleting these objects are done by sending PATCH requests where the payload additionally contains the meta segment as shown below:
+
+    ```javascript
+    {
+       "data": {
+          "type":"resource-type",
+          "attributes":{
+             // All mandatory attributes
+          },
+          "relationships": {
+             // All mandatory relationships
+          },
+          "meta": {
+             "in-trash":true
+          }
+       }
+    }
+    ```
+
+    When fetching many resources of a resource with an `in-trash` flag, by default only resources that are not in trash will be returned.
+    The user can override this behavior by adding an `in-trash` filter to their query.
+    Examples for in-trash filters and their impacts are provided for `/v0/projects` path.
+
+    ### Asynchronous vs. synchronous API endpoints
+
+    The `async` endpoints accept POST and PATCH requests for processing but the object state may not be up-to-date in immediately subsequent GET requests. The non-async endpoints will only return once the request has been fully processed.
+
+    ### Recipes
+
+    Some resources have useful queries that are too complex to be expressed with common filters. These queries have been encoded into a \"recipe\" that can be used
+    by adding the `recipe` parameter and selecting one of the enumerated recipes.
+
+    ### Testing Notes
+
+    Note that `POST` and `PATCH` requests from this documentation page will not succeed due to Cross Site Request Forgery (CSRF) restrictions.
+tags:
+  - name: ToolVersionZero
+  - name: ToolVersionZeroAsync
+  - name: ApplicationVersionZero
+  - name: ProjectVersionZero
+  - name: ProjectVersionZeroAsync
+  - name: RunVersionZero
+  - name: RunVersionZeroAsync
+  - name: BranchVersionZero
+  - name: BranchVersionZeroAsync
+  - name: RevisionVersionZero
+  - name: RevisionVersionZeroAsync
+  - name: ProjectPreferenceVersionZero
+  - name: projectPropertyKeyVersionZero
+paths:
+  /v0/tools:
+    get:
+      tags:
+        - ToolVersionZero
+      description: Fetch all the available tools in the particular organization.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[tool][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter by name.
+          schema:
+            type: string
+        - name: filter[tool][version][$eq]
+          in: query
+          required: false
+          description: E.g. filter by version string.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolV0Resources"
+      operationId: get_v0_tools
+    post:
+      tags:
+        - ToolVersionZero
+      description: Create a tool with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ToolV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_tools
+  /v0/tools/{tool-id}:
+    get:
+      tags:
+        - ToolVersionZero
+      description: Fetch a tool with the given tool-id.
+      parameters:
+        - name: tool-id
+          in: path
+          required: true
+          description: The id of the tool to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_tools_tool_id
+    patch:
+      tags:
+        - ToolVersionZero
+      description: Update a tool with the given attributes.
+      parameters:
+        - name: tool-id
+          in: path
+          required: true
+          description: The id of the tool to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ToolV0Resource2"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_tools_tool_id
+  /async/v0/tools:
+    get:
+      tags:
+        - ToolVersionZeroAsync
+      description: Fetch all the available tools in the particular organization.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[tool][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter by name.
+          schema:
+            type: string
+        - name: filter[tool][version][$eq]
+          in: query
+          required: false
+          description: E.g. filter by version string.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolV0Resources"
+      operationId: get_async_v0_tools
+    post:
+      tags:
+        - ToolVersionZeroAsync
+      description: Create a tool with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ToolV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+            Location:
+              description: The href of the resource to follow, same format as in Json Api 'links'.
+              schema:
+                type: string
+            Resource-Id:
+              description: The ID of the resource to be created.  This ID is the same as that which will be found in the Location header href.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_tools
+  /async/v0/tools/{tool-id}:
+    get:
+      tags:
+        - ToolVersionZeroAsync
+      description: Fetch the tool with the given tool-id.
+      parameters:
+        - name: tool-id
+          in: path
+          required: true
+          description: The id of the tool to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_async_v0_tools_tool_id
+    patch:
+      tags:
+        - ToolVersionZeroAsync
+      description: Update a tool with the given attributes.
+      parameters:
+        - name: tool-id
+          in: path
+          required: true
+          description: The id of the tool to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ToolV0Resource2"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_tools_tool_id
+  /v0/applications:
+    get:
+      tags:
+        - ApplicationVersionZero
+      description: Fetch all applications the current user has permission to view.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[application][in-trash][$eq]
+          in: query
+          required: false
+          description: Filter application based on whether they are `in-trash` or not. E.g. `true` or `false`.
+          schema:
+            type: string
+        - name: filter[application][in-trash][$exists]
+          in: query
+          required: false
+          description: Bypass the automatic `in-trash` filter added by the system. Use the comparison value `true`.
+          schema:
+            type: string
+        - name: filter[application][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter by name equality.
+          schema:
+            type: string
+        - name: filter[application][name][$isubstr]
+          in: query
+          required: false
+          description: E.g. filter by name using case-insensitive substring.
+          schema:
+            type: string
+        - name: include[application][]
+          in: query
+          required: false
+          description: Include related objects in the request. E.g. "projects"
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationV0Resources"
+      operationId: get_v0_applications
+    post:
+      tags:
+        - ApplicationVersionZero
+      description: Create a application with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationV0Resource"
+        description: The application resource to create.
+        required: true
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_applications
+  /v0/applications/{application-id}:
+    get:
+      tags:
+        - ApplicationVersionZero
+      description: Fetch a application with the given application-id.
+      parameters:
+        - name: application-id
+          in: path
+          required: true
+          description: The id of the application to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_applications_application_id
+    patch:
+      tags:
+        - ApplicationVersionZero
+      description: Update a application with the given attributes.
+      parameters:
+        - name: application-id
+          in: path
+          required: true
+          description: The id of the application to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationV0Resource"
+        description: The updated application resource.
+        required: true
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_applications_application_id
+  /v0/projects:
+    get:
+      tags:
+        - ProjectVersionZero
+      description: Fetch all projects the current user has permission to view.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[project][in-trash][$eq]
+          in: query
+          required: false
+          description: Filter projects based on whether they are `in-trash` or not. E.g. `true` or `false`.
+          schema:
+            type: string
+        - name: filter[project][in-trash][$exists]
+          in: query
+          required: false
+          description: Bypass the automatic `in-trash` filter added by the system. Use the comparison value `true`.
+          schema:
+            type: string
+        - name: filter[project][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter by name equality.
+          schema:
+            type: string
+        - name: filter[project][name][$isubstr]
+          in: query
+          required: false
+          description: E.g. filter by name using case-insensitive substring.
+          schema:
+            type: string
+        - name: filter[project][properties][custom-id][$eq]
+          in: query
+          required: false
+          description: E.g. filter by custom property.
+          schema:
+            type: string
+        - name: filter[project][project-preference][is-favorite][$eq]
+          in: query
+          required: false
+          description: Filter projects that are marked as favorite by current user. When comparison value is set to 'true' all favorite projects are returned. When comparison value is set to 'false', ONLY projects that were PREVIOUSLY MARKED AS FAVORITE and now are unmarked as favorite will be returned.
+          schema:
+            type: string
+        - name: include[project][]
+          in: query
+          required: false
+          description: Include related objects in the request. E.g. "branches", "runs".
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectV0Resources"
+      operationId: get_v0_projects
+    post:
+      tags:
+        - ProjectVersionZero
+      description: Create a project with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ProjectV0Resource2"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_projects
+  /v0/projects/{project-id}:
+    get:
+      tags:
+        - ProjectVersionZero
+      description: Fetch a project with the given project-id.
+      parameters:
+        - name: project-id
+          in: path
+          required: true
+          description: The id of the project to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_projects_project_id
+    patch:
+      tags:
+        - ProjectVersionZero
+      description: Update a project with the given attributes.
+      parameters:
+        - name: project-id
+          in: path
+          required: true
+          description: The id of the project to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ProjectV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_projects_project_id
+  /async/v0/projects:
+    get:
+      tags:
+        - ProjectVersionZeroAsync
+      description: Fetch all projects the current user has permission to view.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[project][in-trash][$eq]
+          in: query
+          required: false
+          description: When used with comparison value of 'true', returns all projects that are currently in-trash.
+          schema:
+            type: string
+        - name: filter[project][in-trash][$exists]
+          in: query
+          required: false
+          description: This filter can be used to bypass the automatic in-trash filter added by the system. When used with comparison value of 'true', the filter becomes a tautology (always evaluates to true) but stops the automatic query rewrite with 'int-trash' filter. Setting the value to 'true' forces the system to return all projects regardless of their in-trash status.
+          schema:
+            type: string
+        - name: filter[project][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter by name equality.
+          schema:
+            type: string
+        - name: filter[project][name][$isubstr]
+          in: query
+          required: false
+          description: E.g. filter by name using case-insensitive substring.
+          schema:
+            type: string
+        - name: filter[project][properties][custom-id][$eq]
+          in: query
+          required: false
+          description: E.g. filter by custom property.
+          schema:
+            type: string
+        - name: filter[project][project-preference][is-favorite][$eq]
+          in: query
+          required: false
+          description: Filter projects that are marked as favorite by current user. When comparison value is set to 'true' all favorite projects are returned. When comparison value is set to 'false', ONLY projects that were PREVIOUSLY MARKED AS FAVORITE and now are unmarked as favorite will be returned.
+          schema:
+            type: string
+        - name: include[project][]
+          in: query
+          required: false
+          description: Include related objects in the request. E.g. "branches", "runs".
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectV0Resources"
+      operationId: get_async_v0_projects
+    post:
+      tags:
+        - ProjectVersionZeroAsync
+      description: Create a project with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ProjectV0Resource2"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+            Location:
+              description: The href of the resource to follow, same format as in Json Api 'links'.
+              schema:
+                type: string
+            Resource-Id:
+              description: The ID of the resource to be created.  This ID is the same as that which will be found in the Location header href.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_projects
+  /async/v0/projects/{project-id}:
+    get:
+      tags:
+        - ProjectVersionZeroAsync
+      description: Fetch a project with the given project-id.
+      parameters:
+        - name: project-id
+          in: path
+          required: true
+          description: The id of the project to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_async_v0_projects_project_id
+    patch:
+      tags:
+        - ProjectVersionZeroAsync
+      description: Update a project with the given attributes.
+      parameters:
+        - name: project-id
+          in: path
+          required: true
+          description: The id of the project to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/ProjectV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_projects_project_id
+  /async/v0/projects/batch/set-property:
+    post:
+      tags:
+        - ProjectVersionZeroAsync
+      description: Add or update the given projects with the given property.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchProjectPropertiesV0"
+        description: Object with the list of project id's and the property.
+        required: true
+      responses:
+        "202":
+          description: |
+            Request accepted for processing.
+            ## Batch update process
+            1. If the property key does not already exist on the project, the property will be added to the project.
+            2. If the property key already exists on the project and the value has not changed, the project properties will not be changed.
+            3. If the property key already exists on the project and the value does not match, the property will be updated to the new value.
+            4. If more than one property is provided at a time, an error will raised.
+            5. A project can have a maximum of five properties. If a sixth property is attempted to be added to a project, the update to that project will fail.
+            6. If the user does not have permission to update one of the projects, the update to that project will fail.
+            If an update to one project fails due to the failure of one of the above conditions, other projects will still be attempted to be updated.
+            **Note:**
+            Unlike other endpoints, this batch endpoint does not require nor expect ETag values to be specified in the 'If-Match' header, as we are manipulating multiple projects at a time. Likewise, no ETag values are provided in the response.
+            This compels users of this endpoint to ensure they have the latest representation of the objects to be updated. Requests will be processed as described above, potentially overwriting the properties set by another user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchProjectPropertiesResponseV0"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_projects_batch_set_property
+  /v0/runs:
+    get:
+      tags:
+        - RunVersionZero
+      description: Fetch all runs visible to the current user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[run][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular project.
+          schema:
+            type: string
+        - name: filter[run][revision][branch][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular branch.
+          schema:
+            type: string
+        - name: filter[run][revision][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular revision.
+          schema:
+            type: string
+        - name: filter[run][run-type][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular run type.
+          schema:
+            type: string
+        - name: filter[run][status][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular run status.
+          schema:
+            type: string
+        - name: filter[run][tool][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular tool.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request. If set, must be one of `latest-completed-run-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-completed-run-by-project
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunV0Resources"
+      operationId: get_v0_runs
+    post:
+      tags:
+        - RunVersionZero
+      description: Create a new run.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_runs
+  /async/v0/runs:
+    get:
+      tags:
+        - RunVersionZeroAsync
+      description: Fetch all runs visible to the current user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[run][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular project.
+          schema:
+            type: string
+        - name: filter[run][tool][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter runs to a particular tool.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request. If set, must be one of `latest-completed-run-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-completed-run-by-project
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunV0Resources"
+      operationId: get_async_v0_runs
+    post:
+      tags:
+        - RunVersionZeroAsync
+      description: Create a new run.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+            Location:
+              description: The href of the resource to follow, same format as in Json Api 'links'.
+              schema:
+                type: string
+            Resource-Id:
+              description: The ID of the resource to be created.  This ID is the same as that which will be found in the Location header href.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_runs
+  /async/v0/runs/{run-id}:
+    get:
+      tags:
+        - RunVersionZeroAsync
+      description: Fetch a run by run-id.
+      parameters:
+        - name: run-id
+          in: path
+          required: true
+          description: The id of the run to retrieve.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-completed-run-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-completed-run-by-project
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_async_v0_runs_run_id
+    patch:
+      tags:
+        - RunVersionZeroAsync
+      description: Update a run, e.g. to change the status to "Complete".
+      parameters:
+        - name: run-id
+          in: path
+          required: true
+          description: The id of the run to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_runs_run_id
+  /async/v0/runs/{run-id}/mark-complete:
+    patch:
+      tags:
+        - RunVersionZeroAsync
+      description: Directly update the status attribute of the run to be "Complete".
+      parameters:
+        - name: run-id
+          in: path
+          required: true
+          description: The id of the run to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_runs_run_id_mark_complete
+  /v0/runs/{run-id}:
+    get:
+      tags:
+        - RunVersionZero
+      description: Fetch a run by run-id.
+      parameters:
+        - name: run-id
+          in: path
+          required: true
+          description: The id of the run to retrieve.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-completed-run-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-completed-run-by-project
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_runs_run_id
+    patch:
+      tags:
+        - RunVersionZero
+      description: Update a run, e.g. to change the status to "Complete".
+      parameters:
+        - name: run-id
+          in: path
+          required: true
+          description: The id of the run to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_runs_run_id
+  /v0/run-properties:
+    get:
+      tags:
+        - RunPropertyVersionZero
+      description: Fetch all run properties visible to the current user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-end-timestamp` or `latest-by-run-completion-date`
+          schema:
+            type: string
+            enum:
+              - latest-end-timestamp latest-by-run-completion-date
+        - name: filter[run-property][run][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter run properties to a particular run.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPropertyV0Resources"
+      operationId: get_v0_run_properties
+    post:
+      tags:
+        - RunPropertyVersionZero
+      description: Create a new run property.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunPropertyV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPropertyV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_run_properties
+  /v0/run-properties/{run-property-id}:
+    get:
+      tags:
+        - RunPropertyVersionZero
+      description: Fetch a run property by run-property-id.
+      parameters:
+        - name: run-property-id
+          in: path
+          required: true
+          description: The id of the run property to retrieve.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPropertyV0Resource"
+        "404":
+          description: The run property with the given identifiers could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_run_properties_run_property_id
+    patch:
+      tags:
+        - RunPropertyVersionZero
+      description: Update a run property.
+      parameters:
+        - name: run-property-id
+          in: path
+          required: true
+          description: The id of the run property to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunPropertyV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPropertyV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_run_properties_run_property_id
+  /async/v0/run-properties:
+    get:
+      tags:
+        - RunPropertyVersionZeroAsync
+      description: Fetch all run properties visible to the current user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-end-timestamp` or `latest-by-run-completion-date`
+          schema:
+            type: string
+            enum:
+              - latest-end-timestamp latest-by-run-completion-date
+        - name: filter[run-property][run][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter run properties to a particular run.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPropertyV0Resources"
+      operationId: get_async_v0_run_properties
+    post:
+      tags:
+        - RunPropertyVersionZeroAsync
+      description: Create a new run property.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunPropertyV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+            Location:
+              description: The href of the resource to follow, same format as in Json Api 'links'.
+              schema:
+                type: string
+            Resource-Id:
+              description: The ID of the resource to be created.  This ID is the same as that which will be found in the Location header href.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_run_properties
+  /async/v0/run-properties/{run-property-id}:
+    get:
+      tags:
+        - RunPropertyVersionZeroAsync
+      description: Fetch a run property by run-property-id.
+      parameters:
+        - name: run-property-id
+          in: path
+          required: true
+          description: The id of the run property to retrieve.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPropertyV0Resource"
+        "404":
+          description: The run property with the given identifiers could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_async_v0_run_properties_run_property_id
+    patch:
+      tags:
+        - RunPropertyVersionZeroAsync
+      description: Update a run property.
+      parameters:
+        - name: run-property-id
+          in: path
+          required: true
+          description: The id of the run property to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RunPropertyV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_run_properties_run_property_id
+  /v0/branches:
+    get:
+      tags:
+        - BranchVersionZero
+      description: Fetch all branches visible to the current user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[branch][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter branches to only those that belong to a particular project.
+          schema:
+            type: string
+        - name: filter[branch][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter branches by name.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchV0Resources"
+      operationId: get_v0_branches
+    post:
+      tags:
+        - BranchVersionZero
+      description: Create a new branch on a project.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/BranchV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_branches
+  /v0/branches/{branch-id}:
+    get:
+      tags:
+        - BranchVersionZero
+      description: Fetch a branch by branch-id.
+      parameters:
+        - name: branch-id
+          in: path
+          required: true
+          description: The id of the branch to retrieve.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_branches_branch_id
+    patch:
+      tags:
+        - BranchVersionZero
+      description: Update a branch.
+      parameters:
+        - name: branch-id
+          in: path
+          required: true
+          description: The id of the branch to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/BranchV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_branches_branch_id
+  /async/v0/branches:
+    get:
+      tags:
+        - BranchVersionZeroAsync
+      description: Fetch all branches visible to the current user.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[branch][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter branches to only those that belong to a particular project.
+          schema:
+            type: string
+        - name: filter[branch][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter branches by name.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchV0Resources"
+      operationId: get_async_v0_branches
+    post:
+      tags:
+        - BranchVersionZeroAsync
+      description: Create a new branch on a project.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/BranchV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+            Location:
+              description: The href of the resource to follow, same format as in Json Api 'links'.
+              schema:
+                type: string
+            Resource-Id:
+              description: The ID of the resource to be created.  This ID is the same as that which will be found in the Location header href.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_branches
+  /async/v0/branches/{branch-id}:
+    get:
+      tags:
+        - BranchVersionZeroAsync
+      description: Fetch a branch by branch-id.
+      parameters:
+        - name: branch-id
+          in: path
+          required: true
+          description: The id of the branch to retrieve.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_async_v0_branches_branch_id
+    patch:
+      tags:
+        - BranchVersionZeroAsync
+      description: Update a branch.
+      parameters:
+        - name: branch-id
+          in: path
+          required: true
+          description: The id of the branch to update.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/BranchV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_branches_branch_id
+  /v0/revisions:
+    get:
+      tags:
+        - RevisionVersionZero
+      description: Fetch all revisions the current user has permission to view.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[revision][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter revisions to only those that belong to a particular project.
+          schema:
+            type: string
+        - name: filter[revision][branch][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter revisions to only those that belong to a particular branch.
+          schema:
+            type: string
+        - name: filter[revision][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter revisions by name.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-revision-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-revision-by-project
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionV0Resources"
+      operationId: get_v0_revisions
+    post:
+      tags:
+        - RevisionVersionZero
+      description: Create a revision with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RevisionV0Resource2"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_revisions
+  /v0/revisions/{revision-id}:
+    get:
+      tags:
+        - RevisionVersionZero
+      description: Fetch a revision with the given revision-id.
+      parameters:
+        - name: revision-id
+          in: path
+          required: true
+          description: The id of the revision to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-revision-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-revision-by-project
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_v0_revisions_revision_id
+    patch:
+      tags:
+        - RevisionVersionZero
+      description: Update a revision with the given attributes.
+      parameters:
+        - name: revision-id
+          in: path
+          required: true
+          description: The id of the revision to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RevisionV0Resource"
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_revisions_revision_id
+  /async/v0/revisions:
+    get:
+      tags:
+        - RevisionVersionZeroAsync
+      description: Fetch all revisions the current user has permission to view.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[revision][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter revisions to only those that belong to a particular project.
+          schema:
+            type: string
+        - name: filter[revision][name][$eq]
+          in: query
+          required: false
+          description: E.g. filter revisions by name.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-revision-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-revision-by-project
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionV0Resources"
+      operationId: get_async_v0_revisions
+    post:
+      tags:
+        - RevisionVersionZeroAsync
+      description: Create a revision with the given attributes.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RevisionV0Resource2"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+            Location:
+              description: The href of the resource to follow, same format as in Json Api 'links'.
+              schema:
+                type: string
+            Resource-Id:
+              description: The ID of the resource to be created.  This ID is the same as that which will be found in the Location header href.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1003`, `1100`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_async_v0_revisions
+  /async/v0/revisions/{revision-id}:
+    get:
+      tags:
+        - RevisionVersionZeroAsync
+      description: Fetch a revision with the given revision-id.
+      parameters:
+        - name: revision-id
+          in: path
+          required: true
+          description: The id of the revision to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - name: recipe
+          in: query
+          required: false
+          description: The recipe to use for this fetch request.  `Optional`; if set, must be one of `latest-revision-by-project`
+          schema:
+            type: string
+            enum:
+              - latest-revision-by-project
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionV0Resource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: get_async_v0_revisions_revision_id
+    patch:
+      tags:
+        - RevisionVersionZeroAsync
+      description: Update a revision with the given attributes.
+      parameters:
+        - name: revision-id
+          in: path
+          required: true
+          description: The id of the revision to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+        - $ref: "#/components/parameters/tenantId"
+      requestBody:
+        $ref: "#/components/requestBodies/RevisionV0Resource"
+      responses:
+        "202":
+          description: Request accepted for processing.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot not be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`, `1003`, `1004`, `1100`, `2000`]"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_async_v0_revisions_revision_id
+  /v0/project-preferences:
+    get:
+      tags:
+        - ProjectPreferenceVersionZero
+      description: Fetches all preferences the current user has set on projects.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[project-preference][default-branch][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter project preferences based on default branch.
+          schema:
+            type: string
+        - name: filter[project-preference][is-favorite][$eq]
+          in: query
+          required: false
+          description: E.g. true to get those project preferences that mark a projects as current user's favourite project; false to get all other project preferences that the current user has specified.
+          schema:
+            type: string
+        - name: filter[project-preference][project][id][$eq]
+          in: query
+          required: false
+          description: E.g. filter project preferences to a particular project.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPreferenceV0Resources"
+      operationId: get_v0_project_preferences
+    post:
+      tags:
+        - ProjectPreferenceVersionZero
+      description: Creates a new project preference for the current user.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectPreferenceV0Resource"
+        description: The project preference resource to create.
+        required: true
+      responses:
+        "201":
+          description: Successful creation.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPreferenceV0Resource"
+        "400":
+          description: "When the specified request is invalid. Polaris Code will be one of: [`3000`, `3001`]."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot be fulfilled.  Polaris Code will be: [`1000`, `1001`]."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: post_v0_project_preferences
+  /v0/project-preferences/{preference-id}:
+    get:
+      tags:
+        - ProjectPreferenceVersionZero
+      description: Retrieves a project preference by id, scoped to the current user and organization.
+      parameters:
+        - name: preference-id
+          in: path
+          required: true
+          description: The id of the project preference.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPreferenceV0Resource"
+        "404":
+          description: When the resource by the specified id cannot be found.
+      operationId: get_v0_project_preferences_preference_id
+    patch:
+      tags:
+        - ProjectPreferenceVersionZero
+      description: Updates a project preference. The only mutable fields from user's perspective are default-branch and is-favorite. last-modified-date field cannot be changed by the request.
+      parameters:
+        - name: preference-id
+          in: path
+          required: true
+          description: The id of the project preference to use for this request.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/ifMatchHeader"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectPreferenceV0Resource"
+        description: The updated project preference resource.
+        required: true
+      responses:
+        "200":
+          description: Successful response.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPreferenceV0Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`3000`, `3001`]."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "403":
+          description: "When the specified request is understood but cannot be fulfilled.  Polaris Code will be one of: [`1000`, `1001`, `1002`]."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+        "404":
+          description: When the resource by the specified parameters & Id cannot be found. Also when the project preference is defined for a project that no longer exists or the user does not have access to.
+        "412":
+          description: The specified If-Match version information doesn't match.
+          headers:
+            ETag:
+              description: The version information to be used when performing an update of this resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResource"
+      operationId: patch_v0_project_preferences_preference_id
+  /v0/project-property-keys:
+    get:
+      tags:
+        - projectPropertyKeyVersionZero
+      description: Fetches all the project property keys used on projects within a user's organization.
+      parameters:
+        - $ref: "#/components/parameters/pageLimit"
+        - $ref: "#/components/parameters/pageOffset"
+        - name: filter[project-property-key][id][$isubstr]
+          in: query
+          required: false
+          description: E.g. filter project property keys that are like the given comparison value (case insensitive)
+          schema:
+            type: string
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/recipeNotApplicable"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPropertyKeyV0Resources"
+      operationId: get_v0_project_property_keys
+servers:
+  - url: https://visma.cop.blackduck.com/api/common
+components:
+  parameters:
+    pageLimit:
+      name: page[limit]
+      in: query
+      required: true
+      description: The maximum number of items to be returned in the request.
+      schema:
+        type: integer
+        default: 25
+    pageOffset:
+      name: page[offset]
+      in: query
+      required: false
+      description: The item offset to start the page at.
+      schema:
+        type: integer
+        default: 0
+    tenantId:
+      name: tenant-id
+      in: query
+      required: false
+      description: Sets the organization scope for the request. Only applicable to internal "system" users.
+      schema:
+        type: string
+    applicationId:
+      name: application-id
+      in: query
+      required: false
+      description: Sets the application scope for the request.
+      schema:
+        type: string
+    recipeNotApplicable:
+      name: recipe
+      in: query
+      required: false
+      description: No recipes are applicable. Reserved for future use.
+      schema:
+        type: string
+    ifMatchHeader:
+      name: If-Match
+      in: header
+      required: false
+      description: Latest ETag value of the resource to be updated.
+      schema:
+        type: string
+  requestBodies:
+    ProjectV0Resource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProjectV0Resource"
+      description: The updated project resource.
+      required: true
+    ToolV0Resource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ToolV0Resource"
+      description: The tool resource to create.
+      required: true
+    ProjectV0Resource2:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProjectV0Resource"
+      description: The project resource to create.
+      required: true
+    RevisionV0Resource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RevisionV0Resource"
+      description: The updated revision resource.
+      required: true
+    ToolV0Resource2:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ToolV0Resource"
+      description: The updated tool resource.
+      required: true
+    RunV0Resource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RunV0Resource"
+      required: true
+    RunPropertyV0Resource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RunPropertyV0Resource"
+      required: true
+    BranchV0Resource:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/BranchV0Resource"
+      required: true
+    RevisionV0Resource2:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RevisionV0Resource"
+      description: The revision resource to create.
+      required: true
+  schemas:
+    ObjectContainer:
+      type: object
+      properties:
+        id:
+          type: string
+          description: "`Automatic`"
+        type:
+          type: string
+          description: "`Automatic`"
+      required:
+        - type
+    MetaWithOrganizationTrashApplication:
+      type: object
+      properties:
+        in-trash:
+          type: boolean
+          default: false
+          description: "`Mutable`, `Non-null`: indicates if this object is considered to be in the trash.  Note that all properties are immutable while this object is in the trash."
+        project-count:
+          type: integer
+          format: int64
+          description: "`Automatic`: The count of projects that are not in trash"
+        etag:
+          type: string
+          description: "`Automatic`: The ETag used to update this object at a later time."
+        organization-id:
+          type: string
+          description: "`Automatic`.  The organization-id to which this object belongs."
+    MetaWithOrganizationTrash:
+      type: object
+      properties:
+        in-trash:
+          type: boolean
+          default: false
+          description: "`Mutable`, `Non-null`: indicates if this object is considered to be in the trash.  Note that all properties are immutable while this object is in the trash."
+        etag:
+          type: string
+          description: "`Automatic`: The ETag used to update this object at a later time."
+        organization-id:
+          type: string
+          description: "`Automatic`.  The organization-id to which this object belongs."
+    MetaWithOrganization:
+      type: object
+      properties:
+        etag:
+          type: string
+          description: "`Automatic`: The ETag used to update this object at a later time."
+        organization-id:
+          type: string
+          description: "`Automatic`.  The organization-id to which this object belongs."
+    ResourcesPagination:
+      type: object
+      properties:
+        offset:
+          type: number
+          description: The offset used for this request.  If null, no offset was applied.
+        limit:
+          type: number
+          description: The maximum number of elements returned for this request.  If null, no limit was applied.
+        total:
+          type: number
+          description: The total number of results matching the provided criteria, without regard to the provided offset or limit.
+    LinksPagination:
+      type: object
+      properties:
+        next:
+          type: string
+          description: An absolute URL to the next set of results.  May be null if no next set is available.
+        prev:
+          type: string
+          description: An absolute URL to the previous set of results.  May be null if no previous set is available.
+        first:
+          type: string
+          description: An absolute URL to the first set of results.  May be null if no first set is available.
+        last:
+          type: string
+          description: An absolute URL to the final set of results.  May be null if no final set is available.
+    JsonApiSelfLinks:
+      type: object
+      properties:
+        self:
+          type: object
+          properties:
+            href:
+              type: string
+            meta:
+              type: object
+              properties:
+                durable:
+                  type: string
+          required:
+            - href
+          description: An absolute URL to this resource.
+    JsonApiRelationshipLinks:
+      type: object
+      properties:
+        self:
+          type: string
+        related:
+          type: string
+    JsonApiLazyRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+    ToManyRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectContainer"
+    SubmittingOrganizationV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: organizations
+          description: "`Automatic` `Non-null` The literal string `organizations`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of the submitting organization."
+      required:
+        - type
+        - id
+    SubmittingUserV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: users
+          description: "`Automatic` `Non-null` The literal string `users`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of the submitting user."
+      required:
+        - type
+        - id
+    ToolDomainServiceV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: tool-domain-service
+          description: "`Automatic` `Non-null` The literal string `tool-domain-service`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this tool domain service."
+      required:
+        - type
+        - id
+    ToolV0Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+      required:
+        - name
+        - version
+    ToolV0Relationships:
+      type: object
+      properties:
+        runs:
+          $ref: "#/components/schemas/JsonApiLazyRelationship"
+    ToolV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: tool
+          description: "`Automatic` `Non-null` The literal string `tool`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this tool."
+      required:
+        - type
+        - id
+    ToolV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/ToolV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/ToolV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrash"
+          required:
+            - attributes
+            - relationships
+    ToolV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ToolV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    ToolV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    ApplicationV0Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "`Mutable` (Note: Trailing and leading spaces if any, in this field's value will be trimmed automatically)"
+        description:
+          type: string
+          description: Additional information about the application. `Nullable`
+      required:
+        - name
+    ApplicationV0Relationships:
+      type: object
+      properties:
+        projects:
+          $ref: "#/components/schemas/ToManyRelationship"
+    ApplicationV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/ApplicationV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/ApplicationV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrashApplication"
+          required:
+            - attributes
+            - relationships
+    ApplicationV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ApplicationV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    ApplicationV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApplicationV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    ProjectV0Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "`Mutable` (Note: Trailing and leading spaces if any, in this field's value will be trimmed automatically)"
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+        type:
+          type: string
+          description: Type of artifact to be used as the analysis target. Defaults to REPOSITORY. `Immutable`.
+          enum:
+            - REPOSITORY
+            - WEB_TARGET
+            - EXTERNAL
+        description:
+          type: string
+          description: Additional information about the project. `Nullable`
+      required:
+        - name
+    ProjectV0ProjectPreferenceToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ProjectPreferenceV0RelationshipTarget"
+    ProjectV0UserDefaultBranchToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/BranchV0RelationshipTarget"
+    ProjectV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: project
+          description: "`Automatic` `Non-null` The literal string `project`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this project."
+      required:
+        - type
+        - id
+    ProjectV0Relationships:
+      type: object
+      properties:
+        branches:
+          $ref: "#/components/schemas/JsonApiLazyRelationship"
+        runs:
+          $ref: "#/components/schemas/JsonApiLazyRelationship"
+        project-preference:
+          $ref: "#/components/schemas/ProjectV0ProjectPreferenceToOneRelationship"
+        user-default-branch:
+          $ref: "#/components/schemas/ProjectV0UserDefaultBranchToOneRelationship"
+    ProjectV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/ProjectV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/ProjectV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrash"
+          required:
+            - attributes
+            - relationships
+    ProjectV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ProjectV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    ProjectV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    BatchProjectPropertiesV0:
+      type: object
+      properties:
+        projects:
+          type: array
+          description: "`Required` The list of project ids."
+          example:
+            - 3fa85f64-5717-4562-b3fc-2c963f66afa6
+            - d9f3e58d-1f48-43a1-a953-561702f610ad
+          items:
+            type: string
+            format: uuid
+        properties:
+          type: object
+          description: "`Required` The property to add/update to the projects. Only one property may be specified at a time."
+          example:
+            key: value
+          additionalProperties:
+            type: string
+      required:
+        - projects
+        - property
+    BatchProjectPropertiesResponseV0:
+      type: object
+      properties:
+        ProjectPropertiesResponse:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectPropertiesResponse"
+          example:
+            - project-id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+              success: true
+            - project-id: d9f3e58d-1f48-43a1-a953-561702f610ad
+              success: false
+              message: You do not have permission to perform this operation.
+      required:
+        - ProjectPropertiesResponse
+    ProjectPropertiesResponse:
+      type: object
+      properties:
+        project-id:
+          type: string
+          format: uuid
+          description: The id of the project.
+        success:
+          type: boolean
+        message:
+          type: string
+          example: You do not have permission to perform this operation.
+          description: The success or failure message.
+      required:
+        - project-id
+        - success
+    RunPropertyV0Attributes:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The type of the property.  `Required`.
+          enum:
+            - string
+            - string_list
+            - int64
+            - int64_list
+            - reference
+            - reference_list
+            - interval
+        property-name:
+          type: string
+          description: The name of the property.  `Required`.
+        namespace:
+          type: string
+          description: The namespace of the property.  `Required`.
+        start-timestamp:
+          type: string
+          description: "`Required` (iff the property type is `interval`) The start timestamp of the property for the run, formatted in ISO 8601 format with time zone."
+        end-timestamp:
+          type: string
+          description: "`Required` (iff the property type is `interval`) The end timestamp of the property for the run, formatted in ISO 8601 format with time zone."
+        duration:
+          type: string
+          description: "`Automatic` (iff the property type is `interval`) The duration, in ISO 8601 format, between the start and end timestamp."
+        string-value:
+          type: string
+          description: "`Required` (iff the property type is `string`) The string value of the property for the run."
+          maxLength: 1024
+        string-list-value:
+          type: array
+          description: "`Required` (iff the property type is `string_list`) The string list value of the property for the run."
+          items:
+            type: string
+        reference-value:
+          type: string
+          description: "`Required` (iff the property type is `reference`) The reference value of the property for the run."
+          maxLength: 1024
+        reference-list-value:
+          type: array
+          description: "`Required` (iff the property type is `reference_list`) The reference list value of the property for the run."
+          items:
+            type: string
+        integer-value:
+          type: integer
+          format: int64
+          description: "`Required` (iff the property type is `int64`) The integer value (stored as a signed 64-bit integer) of the property for the run."
+        integer-list-value:
+          type: array
+          description: "`Required` (iff the property type is `int64_list`) The integer list value (stored as a signed 64-bit integer) of the property for the run."
+          items:
+            type: integer
+            format: int64
+    RunPropertyV0RunRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/RunV0RelationshipTarget"
+      description: "`Eager` `Non-null` The run that this property is associated with."
+    RunPropertyV0Relationships:
+      type: object
+      properties:
+        run:
+          $ref: "#/components/schemas/RunPropertyV0RunRelationship"
+    RunPropertyV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/RunPropertyV0Attributes"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            relationships:
+              $ref: "#/components/schemas/RunPropertyV0Relationships"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrash"
+          required:
+            - attributes
+    RunPropertyV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RunPropertyV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    RunPropertyV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunPropertyV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    RunV0Attributes:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - Incomplete
+            - Complete
+          default: Incomplete
+          description: "`Mutable`"
+        creation-date:
+          type: string
+          description: "`Automatic` The date (in UTC) when this run was added to Polaris."
+        completed-date:
+          type: string
+          description: "`Automatic` The date (in UTC) when this run was made complete."
+        segment:
+          type: boolean
+          default: false
+          description: If the run is a segment in a stream of runs.
+        upload-id:
+          type: string
+          description: The upload id of the run
+        run-type:
+          type: string
+          description: The run type of the run
+        fingerprints:
+          type: array
+          items:
+            type: string
+          description: "`Required` The fingerprints used by this run."
+      required:
+        - status
+        - segment
+        - upload-id
+        - run-type
+        - fingerprints
+    RunV0PreviousRunToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/RunV0RelationshipTarget"
+      description: "`Eager` `Nullable` The previous run segment.  Both this Run and the previous Run must be segments."
+      required:
+        - data
+    RunV0RevisionToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/RevisionV0RelationshipTarget"
+      description: "`Eager` `Mutable` `Nullable` The revision associated with this run.  Note that, if set, said revision must belong to the same project as the project associated with this run."
+    RunV0ProjectToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ProjectV0RelationshipTarget"
+      description: "`Eager` `Non-null` The project associated with this run."
+    RunV0ToolToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ToolV0RelationshipTarget"
+      description: "`Eager` `Non-null` The tool associated with this run.  Note that the given tool must exist in the same tenant as this run."
+    RunV0ToolDomainServiceToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ToolDomainServiceV0RelationshipTarget"
+      description: "`Eager` `Non-null` The tool domain service this run is associated with."
+    RunV0SubmittingUserToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/SubmittingUserV0RelationshipTarget"
+      description: "`Eager` `Non-null` `Automatic` The submitting user this run is associated with."
+    RunV0SubmittingOrganizationToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/SubmittingOrganizationV0RelationshipTarget"
+      description: "`Eager` `Non-null` `Automatic` The submitting organization this run is associated with."
+    RunV0Relationships:
+      type: object
+      properties:
+        previous-run:
+          $ref: "#/components/schemas/RunV0PreviousRunToOneRelationship"
+        attributes:
+          $ref: "#/components/schemas/JsonApiLazyRelationship"
+        revision:
+          $ref: "#/components/schemas/RunV0RevisionToOneRelationship"
+        project:
+          $ref: "#/components/schemas/RunV0ProjectToOneRelationship"
+        submitting-organization:
+          $ref: "#/components/schemas/RunV0SubmittingOrganizationToOneRelationship"
+        submitting-user:
+          $ref: "#/components/schemas/RunV0SubmittingUserToOneRelationship"
+        tool:
+          $ref: "#/components/schemas/RunV0ToolToOneRelationship"
+        tool-domain-service:
+          $ref: "#/components/schemas/RunV0ToolDomainServiceToOneRelationship"
+    RunV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/RunV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/RunV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrash"
+          required:
+            - attributes
+    RunV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: run
+          description: "`Automatic` `Non-null` The literal string `run`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this run."
+      required:
+        - type
+        - id
+    RunV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RunV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    RunV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    BranchV0Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "`Mutable`"
+        main-for-project:
+          type: boolean
+          description: "`Mutable`"
+      required:
+        - name
+    BranchV0ProjectToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ProjectV0RelationshipTarget"
+    BranchV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: branch
+          description: "`Automatic` `Non-null` The literal string `branch`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this branch."
+      required:
+        - type
+        - id
+    BranchV0Relationships:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/BranchV0ProjectToOneRelationship"
+        revisions:
+          $ref: "#/components/schemas/JsonApiLazyRelationship"
+      required:
+        - project
+        - revisions
+    BranchV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/BranchV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/BranchV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrash"
+          required:
+            - attributes
+            - relationships
+    BranchV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/BranchV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    BranchV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BranchV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    RevisionV0Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: A user supplied semantic identifier for the Revision. `Immutable`
+        timestamp:
+          type: string
+          description: The time when the revision is created.
+        modified-off-the-record:
+          type: boolean
+          default: false
+          description: A Revision is `modified-off-the-record` when it doesn't exist in the Scm.  Most Revisions come directly from the Scm, hence they aren't `modified-off-the-record`.
+      required:
+        - name
+    RevisionV0BranchToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/BranchV0RelationshipTarget"
+      required:
+        - data
+      description: "`Eager` `Non-null` A reference to the branch that this revision is associated with."
+    RevisionV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: revision
+          description: "`Automatic` `Non-null` The literal string `revision`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this revision."
+      required:
+        - type
+        - id
+    RevisionV0Relationships:
+      type: object
+      properties:
+        branch:
+          $ref: "#/components/schemas/RevisionV0BranchToOneRelationship"
+        runs:
+          $ref: "#/components/schemas/JsonApiLazyRelationship"
+      required:
+        - branch
+        - runs
+    RevisionV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/RevisionV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/RevisionV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganizationTrash"
+          required:
+            - attributes
+            - relationships
+    RevisionV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RevisionV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    RevisionV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevisionV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    ProjectPreferenceV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectPreferenceV0"
+        links:
+          $ref: "#/components/schemas/LinksPagination"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+        - meta
+    ProjectPreferenceV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ProjectPreferenceV0"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResource"
+      required:
+        - data
+    ProjectPreferenceV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            attributes:
+              $ref: "#/components/schemas/ProjectPreferenceV0Attributes"
+            relationships:
+              $ref: "#/components/schemas/ProjectPreferenceV0Relationships"
+            links:
+              $ref: "#/components/schemas/JsonApiSelfLinks"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganization"
+          required:
+            - attributes
+            - relationships
+    ProjectPreferenceV0Attributes:
+      type: object
+      properties:
+        is-favorite:
+          type: boolean
+          default: true
+          description: Whether or not the related project is marked as user's favorite. `Specified` and `Mutable` and `Non-null`.
+        last-updated:
+          type: string
+          description: The date in UTC of last update to project preference.  `Automatic` and `Mutable`.
+      required:
+        - is-favorite
+    ProjectPreferenceV0Relationships:
+      type: object
+      properties:
+        submitting-user:
+          $ref: "#/components/schemas/ProjectPreferenceV0SubmittingUserToOneRelationship"
+        submitting-organization:
+          $ref: "#/components/schemas/ProjectPreferenceV0SubmittingOrganizationToOneRelationship"
+        project:
+          $ref: "#/components/schemas/ProjectPreferenceV0ProjectToOneRelationship"
+        default-branch:
+          $ref: "#/components/schemas/ProjectPreferenceV0BranchToOneRelationship"
+      required:
+        - user-preference
+        - project
+        - default-branch
+    ProjectPreferenceV0SubmittingUserToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/SubmittingUserV0RelationshipTarget"
+    ProjectPreferenceV0SubmittingOrganizationToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/SubmittingOrganizationV0RelationshipTarget"
+    ProjectPreferenceV0ProjectToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/ProjectV0RelationshipTarget"
+    ProjectPreferenceV0BranchToOneRelationship:
+      type: object
+      properties:
+        links:
+          $ref: "#/components/schemas/JsonApiRelationshipLinks"
+        data:
+          $ref: "#/components/schemas/BranchV0RelationshipTarget"
+    ProjectPreferenceV0RelationshipTarget:
+      type: object
+      properties:
+        type:
+          type: string
+          default: project-preference
+          description: "`Automatic` `Non-null` The literal string project-preference`."
+        id:
+          type: string
+          description: "`Non-null` `Required` The ID of this project-preference."
+      required:
+        - type
+        - id
+    ProjectPropertyKeyV0Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectPropertyKeyV0"
+        meta:
+          $ref: "#/components/schemas/ResourcesPagination"
+      required:
+        - data
+        - meta
+    ProjectPropertyKeyV0Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ProjectPropertyKeyV0"
+      required:
+        - data
+    ProjectPropertyKeyV0:
+      allOf:
+        - $ref: "#/components/schemas/ObjectContainer"
+        - properties:
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganization"
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: The Polaris Code categorizing the problem.  Codes correspond 1-to-1 with Titles.
+        title:
+          type: string
+          description: The Polaris Title (human readable) categorizing the problem.  Titles correspond 1-to-1 with Codes.
+        detail:
+          type: string
+          description: "A human readable explanation of the problem that will vary depending on the exact request.  When present, this will describe the exact problem with the request (ie: field `abc` must be of type int, but string was found)."
+      required:
+        - code
+        - title
+    ErrorResource:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Error"
+      required:
+        - errors
+    JsonApiIncludedResource:
+      type: object
+      discriminator:
+        propertyName: type
+      properties:
+        type:
+          type: string
+          description: "`Automatic`, `Non-null`."
+        id:
+          type: string
+          description: "`Automatic`, `Non-null`.  The unique identifier of this entity."
+    ProjectV0Included:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResource"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/ProjectV0Attributes"
+    RevisionV0Included:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResource"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/RevisionV0Attributes"
+    ProjectPreferenceV0Included:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResource"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/ProjectPreferenceV0Attributes"
+            meta:
+              $ref: "#/components/schemas/MetaWithOrganization"
+    BranchV0Included:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResource"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/BranchV0Attributes"

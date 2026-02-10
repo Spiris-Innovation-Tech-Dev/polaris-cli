@@ -1,0 +1,1683 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: Issue Query - v1
+  description: " <h2>Purpose</h2> <p> To provide access to query the Issue Management Services for issues and counts. </p> <p> It is important to note that although this specifies a JSON:API to access these entities, they are **read only**. None of the entities here can be created or mutated through this API. </p> <p> The `/roll-up-counts` endpoint provides roll up counts for both total, and grouped by specific parameters. The IDs in the resources provided are most often generated on demand and should not be used for caching. The same request multiple times in a row will provide documents with different IDs, however within each request the IDs will be consistent. <p> The Issue entity described in this document is context-dependent - meaning the entity's existence or attributes may change depending on the context (branch, revision, runs) of the request (for example: an Issue may not exist in all revisions of a project, or an Issue's severity might change between runs). That said, the Id of the Issue will remain the same, so it is important that clients do not cache only based on the Id. </p> <h4>Supported Filters</h4> <p> <ul> <li>[issue] [finding-key] [{operator}] = ({finding-key} | [{finding-key-1},..,{finding-key-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', '$in, or $exists'.</span></li> <li>[issue] [issue-key] [{operator}] = ({issue-key} | [{issue-key-1},..,{issue-key-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', '$in, or $exists'.</span></li> <li>[issue] [issue-type] [{operator}] = ({issue-type} | [{issue-type-1},..,{issue-type-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', '$in, or $exists'.</span></li> <li>[issue] [tool] [id] [{operator}] = ({tool-id} | [{tool-id-1},..,{tool-id-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', $in, or '$expr'.</span></li> <li>[issue] [sub-tool] [{operator}] = ({sub-tool-name} | [{sub-tool-name-1,...,{sub-tool-name-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', $in, or '$expr'.</span></li> <li>[issue] [tool-domain-service] [id] [{operator}] = ({tds-id} | [{tds-id-1},..,{tds-id-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', '$in, or $exists'.</span></li> <li>Beta: [issue] [reachability] [id] [{operator}] = ({reachability} | [{reachability-1},..,{reachability-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq', or '$in.</span></li> <li>[issue] [status] [{operator}] = ({status} | [{status-1}, ..., {status-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'. {status} can be 'opened' or 'closed'.</span></li> <li>[issue] [status-closed-date] [{operator}] = ({datetime}) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$gte' or '$lte'. {datetime} must be formatted as <b>YYYY</b>-<b>MM</b>-<b>DD</b>T<b>hh</b>:<b>mm</b>:<b>ss</b>.<b>x</b>Z where x can be 0 to 9 digits long.</span></li> <li>[issue] [status-opened-date] [{operator}] = ({datetime}) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$gte' or '$lte'. {datetime} must be formatted as <b>YYYY</b>-<b>MM</b>-<b>DD</b>T<b>hh</b>:<b>mm</b>:<b>ss</b>.<b>x</b>Z where x can be 0 to 9 digits long.</span></li> <li>[issue] [dismissed] [{operator}] = ({status} | [{status-1}, ..., {status-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'. {status} can be 'true' or 'false'.</span> This filter is deprecated. Consider using the triage-status filter.</li> <li>[issue] [taxonomy] [id] [{operator}] = {taxonomy-id} <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'.</span></li> <li>[issue] [taxonomy] [taxonomy-type] [{operator}] = {taxonomy-type} <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'.</span></li> <li>[issue] [taxonomy] [id] [{taxonomy-id}] [taxon] [{operator}] = ({taxon-id} | [{taxon-id-1},..,{taxon-id-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'.</span></li> <li>[issue] [taxonomy] [taxonomy-type] [{taxonomy-type}] [taxon] [{operator}] = ({taxon-id} | [{taxon-id-1},..,{taxon-id-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'.</span></li> <li>[issue] [triage-owner] [id] [{operator}] = ({user-id}) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'.</span></li> <li>[issue] [triage-status] [{operator}] = ({status} | [{status-1}, ..., {status-N}]) <span style='border: 1px solid; background: #FFFE9F;'>{operator} can be '$eq' or '$in'. {status} can be 'not-triaged', 'dismiss-requested', 'to-be-fixed', 'dismissed-false-positive', 'dismissed-intentional', and 'dismissed-other'.</span></li> <li>[issue] [$expr] = ({criteria expression}) <span style='border: 1px solid; background: #FFFE9F;'>{criteria expression} can be any valid criteria expression.</span></li> </ul> <p> ***  Valid {taxonomy-type} values can be retrieved from ./taxonomies endpoint at data[*].taxonomy-type. </p> <p> <h4>Supported Group-Bys</h4> <p> <ul> <li>[issue] [issue-type]</li> <li>[issue] [path] <span style='border: 1px solid; background: #96fc67;'>Implicit group-by if no group-by parameter is provided</span> </li> <li>[issue] [tool]</li> <li>[issue] [sub-tool]</li> <li>[issue] [tool-domain-service]</li> <li>Beta: [issue] [reachability]</li> <li>[issue] [taxonomy] [id] [{taxonomy-id}] [taxon] [{taxon-id-1},..,{taxon-id-N}]</li> <li>[issue] [taxonomy] [taxonomy-type] [{taxonomy-type}] [taxon] [{taxon-id-1},..,{taxon-id-N}]</li> <li>[issue] [triage-owner]</li> <li>[issue] [triage-status]</li> <li>[issue] [taxonomy] [id] [{taxonomy-id}]</li> <li>[issue] [taxonomy] [taxonomy-type] [{taxonomy-type}]</li> <li>[issue] [project] <span style='border: 1px solid; background: #96fc67;'>only available for application scoped requests</span></li> </ul> <p> "
+tags:
+  - name: RollUpCountsVersionOne
+  - name: QueryIssuesVersionOne
+  - name: QueryStatusCountsVersionOne
+paths:
+  /roll-up-counts:
+    get:
+      tags:
+        - RollUpCountsVersionOne
+      parameters:
+        - name: tenant-id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: application-id
+          in: query
+          required: false
+          description: The application group to use.
+          schema:
+            type: string
+        - name: project-id
+          in: query
+          required: false
+          description: The project to use. Mandatory if no `application-id` is supplied.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: false
+          description: "The branch to use.  In absence of an `application-id`, exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided. Not allowed when an `application-id` is provided."
+          schema:
+            type: string
+        - name: revision-id
+          in: query
+          required: false
+          description: "The revision to use.  In absence of an `application-id`, exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided. Not allowed when an `application-id` is provided."
+          schema:
+            type: string
+        - name: run-id[]
+          in: query
+          required: false
+          description: "The run(s) to use. In absence of an `application-id`, exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided. Not allowed when an `application-id` is provided."
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: compare-branch-id
+          in: query
+          required: false
+          description: The branch ID to compare against.  In absence of an `application-id`, at most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided. Not allowed when an `application-id` is provided.
+          schema:
+            type: string
+        - name: compare-revision-id
+          in: query
+          required: false
+          description: The revision ID to compare against.  In absence of an `application-id`, at most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided. Not allowed when an `application-id` is provided.
+          schema:
+            type: string
+        - name: compare-run-id[]
+          in: query
+          required: false
+          description: The run ID(s) to compare against.  In absence of an `application-id`, at most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided. Not allowed when an `application-id` is provided. The string 'earlier' or 'later' may be used, to compare against the run ids immediately preceding or following the runs matched by the non-compare branch / revision / run IDs.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: for-child-paths
+          in: query
+          required: false
+          description: Whether to provide roll up counts for child paths. This query parameter replaces the old /child-roll-up-counts endpoint. Not allowed when an `application-id` is provided.
+          schema:
+            type: boolean
+        - name: group-by
+          in: query
+          required: false
+          description: "The group-by switch.  Acceptable values are attribute names of the issue in dot notation (ie: 'issue.issue-type' or 'issue.tool-name')."
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          description: The path (as an array [part1,part2,..partN]) in the tree to request information at. Not allowed when an `application-id` is provided.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/filterByFindingKey"
+        - $ref: "#/components/parameters/filterByIssueKey"
+        - $ref: "#/components/parameters/filterByIssueType"
+        - $ref: "#/components/parameters/filterByToolId"
+        - $ref: "#/components/parameters/filterBySubToolId"
+        - $ref: "#/components/parameters/filterByToolDomainServiceId"
+        - $ref: "#/components/parameters/filterByIssueStatus"
+        - $ref: "#/components/parameters/filterByIssueClosedDate"
+        - $ref: "#/components/parameters/filterByIssueOpenedDate"
+        - $ref: "#/components/parameters/filterByIssueDismissed"
+        - $ref: "#/components/parameters/filterByTaxonomyId"
+        - $ref: "#/components/parameters/filterByTaxonomyType"
+        - $ref: "#/components/parameters/filterByTriageOwner"
+        - $ref: "#/components/parameters/filterByTriageStatus"
+        - name: page[offset]
+          in: query
+          required: false
+          description: Which page to view.  If this parameter is specified, then page[limit] must also be specified.
+          schema:
+            type: string
+        - name: page[limit]
+          in: query
+          required: true
+          description: The size of the page.  If this parameter is specified, then page[offset] must also be specified.
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: The attribute that will be used to sort response data.
+          schema:
+            type: string
+            enum:
+              - count
+        - name: discard-empty-taxa
+          in: query
+          required: false
+          description: Whether to include or exclude zero count issues when grouping by taxonomies. Default is to include them.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountV1Resources"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+      operationId: get_roll_up_counts
+  /roll-up-counts/actions/fetch:
+    post:
+      tags:
+        - RollUpCountsVersionOne
+      parameters:
+        - name: sort
+          in: query
+          required: false
+          description: The attribute that will be used to sort response data.
+          schema:
+            type: string
+            enum:
+              - count
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                tenant-id:
+                  type: string
+                application-id:
+                  description: The application group to use.
+                  type: string
+                project-id:
+                  description: The project to use. Mandatory if no `application-id` is supplied.
+                  type: string
+                branch-id:
+                  description: "The branch to use. In absence of an `application-id`, exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided. Not allowed when an `application-id` is provided."
+                  type: string
+                revision-id:
+                  description: "The revision to use. In absence of an `application-id`, exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided. Not allowed when an `application-id` is provided."
+                  type: string
+                run-id[]:
+                  description: "The run(s) to use. In absence of an `application-id`, exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided. Not allowed when an `application-id` is provided."
+                  type: array
+                  items:
+                    type: string
+                compare-branch-id:
+                  description: The branch ID to compare against. In absence of an `application-id`, at most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided. Not allowed when an `application-id` is provided.
+                  type: string
+                compare-revision-id:
+                  description: The revision ID to compare against. In absence of an `application-id`, at most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided. Not allowed when an `application-id` is provided.
+                  type: string
+                compare-run-id[]:
+                  description: The run ID(s) to compare against. In absence of an `application-id`, at most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided. Not allowed when an `application-id` is provided. The string 'earlier' or 'later' may be used, to compare against the run ids immediately preceding or following the runs matched by the non-compare branch / revision / run IDs.
+                  type: array
+                  items:
+                    type: string
+                group-by:
+                  description: "The group-by switch.  Acceptable values are attribute names of the issue in dot notation (ie: 'issue.issue-type' or 'issue.tool-name')."
+                  type: string
+                path:
+                  description: The path (as an array [part1,part2,..partN]) in the tree to request information at. Not allowed when an `application-id` is provided.
+                  type: string
+                filter:
+                  description: See the House Keeping document on filter format.
+                  type: string
+                for-child-paths:
+                  description: Whether to provide roll up counts for child paths.  This query parameter replaces the old /child-roll-up-counts endpoint. Not allowed when an `application-id` is provided.
+                  type: boolean
+                page[offset]:
+                  description: Which page to view.  If this parameter is specified, then page[limit] must also be specified.
+                  type: string
+                page[limit]:
+                  description: The size of the page.  If this parameter is specified, then page[offset] must also be specified.
+                  type: string
+              required:
+                - page[limit]
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountV1Resources"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+      operationId: post_roll_up_counts_actions_fetch
+  /issues:
+    get:
+      tags:
+        - QueryIssuesVersionOne
+      parameters:
+        - name: tenant-id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: project-id
+          in: query
+          required: true
+          description: The project to use.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: false
+          description: "The branch to use.  Exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided."
+          schema:
+            type: string
+        - name: revision-id
+          in: query
+          required: false
+          description: "The revision to use.  Exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided."
+          schema:
+            type: string
+        - name: run-id[]
+          in: query
+          required: false
+          description: "The run(s) to use.  Exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided."
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: compare-branch-id
+          in: query
+          required: false
+          description: The branch ID to compare against.  At most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided.
+          schema:
+            type: string
+        - name: compare-revision-id
+          in: query
+          required: false
+          description: The revision ID to compare against.  At most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided.
+          schema:
+            type: string
+        - name: compare-run-id[]
+          in: query
+          required: false
+          description: The run ID(s) to compare against.  At most one of `compare-branch-id`, `compare-revision-id`, or `compare-run-id[]` may be provided.  The string 'earlier' or 'later' may be used, to compare against the run ids immediately preceding or following the runs matched by the non-compare branch / revision / run IDs.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: path
+          in: query
+          required: false
+          description: The path (as an array [part1,part2,..partN]) in the tree to request information at.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/filterByFindingKey"
+        - $ref: "#/components/parameters/filterByIssueKey"
+        - $ref: "#/components/parameters/filterByIssueType"
+        - $ref: "#/components/parameters/filterByToolId"
+        - $ref: "#/components/parameters/filterBySubToolId"
+        - $ref: "#/components/parameters/filterByToolDomainServiceId"
+        - $ref: "#/components/parameters/filterByIssueStatus"
+        - $ref: "#/components/parameters/filterByIssueClosedDate"
+        - $ref: "#/components/parameters/filterByIssueOpenedDate"
+        - $ref: "#/components/parameters/filterByIssueDismissed"
+        - $ref: "#/components/parameters/filterByTaxonomyId"
+        - $ref: "#/components/parameters/filterByTaxonomyType"
+        - $ref: "#/components/parameters/filterByTriageOwner"
+        - $ref: "#/components/parameters/filterByTriageStatus"
+        - name: page[offset]
+          in: query
+          required: false
+          description: Which page to view.  If this parameter is specified, then page[limit] must also be specified.
+          schema:
+            type: string
+        - name: page[limit]
+          in: query
+          required: true
+          description: The size of the page.  If this parameter is specified, then page[offset] must also be specified.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/includeIssue"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueV1Resources"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+        "403":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`1100`, `1101`]."
+        "406":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2100`]."
+      operationId: get_issues
+  /issues/{issue-id}:
+    get:
+      tags:
+        - QueryIssuesVersionOne
+      parameters:
+        - name: tenant-id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: issue-id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: project-id
+          in: query
+          required: true
+          description: The project to use.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: false
+          description: "The branch to use.  Exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided."
+          schema:
+            type: string
+        - name: revision-id
+          in: query
+          required: false
+          description: "The revision to use.  Exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided."
+          schema:
+            type: string
+        - name: run-id[]
+          in: query
+          required: false
+          description: "The run(s) to use.  Exactly one of: `branch-id`, `revision-id`, and `run-id[]` must be provided."
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - $ref: "#/components/parameters/includeIssue"
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueV1Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+        "403":
+          description: "The request was valid, but the server is refusing action. The user might not have the necessary permissions for a resource, or may need an account of some sort.  Polaris Code will be one of: [`1100`, `1101`]."
+        "404":
+          description: When the specified entity cannot be found.
+        "406":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2100`]."
+      operationId: get_issues_issue_id
+  /discovery/group-bys:
+    get:
+      tags:
+        - DiscoveryVersionOne
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupByV1Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+        "403":
+          description: "The request was valid, but the server is refusing action. The user might not have the necessary permissions for a resource, or may need an account of some sort.  Polaris Code will be one of: [`1100`, `1101`]."
+      operationId: get_discovery_group_bys
+  /discovery/filter-keys:
+    get:
+      tags:
+        - DiscoveryVersionOne
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilterKeyV1Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+        "403":
+          description: "The request was valid, but the server is refusing action. The user might not have the necessary permissions for a resource, or may need an account of some sort.  Polaris Code will be one of: [`1100`, `1101`]."
+      operationId: get_discovery_filter_keys
+  /discovery/filter-keys/{key-id}/values:
+    get:
+      tags:
+        - DiscoveryVersionOne
+      parameters:
+        - name: key-id
+          in: path
+          required: true
+          description: The id of the filter key for which the values are being requested.
+          schema:
+            type: string
+        - name: substring
+          in: query
+          required: false
+          description: An optional parameter. If provided, restricts the list of values returned to those that match the substring.
+          schema:
+            type: string
+        - name: page[offset]
+          in: query
+          required: false
+          description: Which page to view.  If this parameter is specified, then page[limit] must also be specified.
+          schema:
+            type: string
+        - name: page[limit]
+          in: query
+          required: true
+          description: The size of the page.  If this parameter is specified, then page[offset] must also be specified.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilterValueV1Resource"
+        "400":
+          description: "When the specified request is invalid.  Polaris Code will be one of: [`2101`]."
+        "403":
+          description: "The request was valid, but the server is refusing action. The user might not have the necessary permissions for a resource, or may need an account of some sort.  Polaris Code will be one of: [`1100`, `1101`]."
+      operationId: get_discovery_filter_keys_key_id_values
+  /counts/status-change:
+    get:
+      tags:
+        - QueryStatusCountsVersionOne
+      parameters:
+        - name: application-id
+          in: query
+          required: false
+          description: The application to use. At least one of `application-id` or `project-id` are required. When `application-id` is supplied, `branch-id` parameter is not allowed.
+          schema:
+            type: string
+        - name: project-id
+          in: query
+          required: false
+          description: The project to use. At least one of `application-id` or `project-id` are required.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: false
+          description: The branch to use. Required in absence of an `application-id`. Not allowed in presence of an `application-id`.
+          schema:
+            type: string
+        - name: transition-type
+          in: query
+          required: true
+          description: "The transition type, either: 'opened' or 'closed'"
+          schema:
+            type: string
+        - name: start-date
+          in: query
+          required: false
+          description: "Get issue transitions after this date, in ISO UTC for example: 1970-01-01T00:00:00.001Z. Defaults to the date of earliest qualified transition."
+          schema:
+            type: string
+        - name: end-date
+          in: query
+          required: false
+          description: "Get issue transitions before this date, in ISO UTC for example: 1970-01-01T00:00:00.001Z. Defaults to now."
+          schema:
+            type: string
+        - name: granularity
+          in: query
+          required: false
+          description: The bucket size to use for the counts.
+          schema:
+            type: string
+            enum:
+              - year
+              - month
+              - day
+              - hour
+            default: day
+        - name: response-timezone-offset
+          in: query
+          required: false
+          description: The timezone for the response, such as 'UTC' (default), 'GMT-6', 'GMT+1', etc
+          schema:
+            type: string
+            default: UTC
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChangeCountResponse"
+      operationId: get_counts_status_change
+  /counts/status:
+    get:
+      tags:
+        - QueryStatusCountsVersionOne
+      description: Returns counts of Open and Closed issues within the requesteed time frames. This end-point is **Deprecated**. Please use `/counts/issues-over-time?group-by=[issue][status]` instead.
+      parameters:
+        - name: application-id
+          in: query
+          required: false
+          description: The application to use. At least one of `application-id` or `project-id` are required. When `application-id` is supplied, `branch-id` parameter is not allowed.
+          schema:
+            type: string
+        - name: project-id
+          in: query
+          required: false
+          description: The project to use. At least one of `application-id` or `project-id` are required.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: false
+          description: The branch to use. Required in absence of an `application-id`. Not allowed in presence of an `application-id`.
+          schema:
+            type: string
+        - name: start-date
+          in: query
+          required: false
+          description: "Get issue transitions after this date, in ISO UTC for example: 1970-01-01T00:00:00.001Z.  Defaults to the earliest revision date among all of the qualified revisions."
+          schema:
+            type: string
+        - name: end-date
+          in: query
+          required: false
+          description: "Get issue transitions before this date, in ISO UTC for example: 1970-01-01T00:00:00.001Z. Defaults to now."
+          schema:
+            type: string
+        - name: granularity
+          in: query
+          required: false
+          description: The stride size to use for the counts.
+          schema:
+            type: string
+            enum:
+              - year
+              - month
+              - day
+              - hour
+            default: day
+        - name: response-timezone-offset
+          in: query
+          required: false
+          description: The timezone for the response, such as 'UTC' (default), 'GMT-6', 'GMT+1', etc
+          schema:
+            type: string
+            default: UTC
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusCountResponse"
+      operationId: get_counts_status
+  /counts/issues-over-time:
+    get:
+      tags:
+        - QueryStatusCountsVersionOne
+      description: Returns counts of issues within requested time frames. Counts are grouped based on the `group-by` parameter. If no `group-by` parameter is provided, counts are grouped by their Open/Closed status.
+      parameters:
+        - name: application-id
+          in: query
+          required: false
+          description: The application to use. At least one of `application-id` or `project-id` are required. When `application-id` is supplied, `branch-id` parameter is not allowed.
+          schema:
+            type: string
+        - name: project-id
+          in: query
+          required: false
+          description: The project to use. At least one of `application-id` or `project-id` are required.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: false
+          description: The branch to use. Required in absence of an `application-id`. Not allowed in presence of an `application-id`.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/filterByFindingKey"
+        - $ref: "#/components/parameters/filterByIssueKey"
+        - $ref: "#/components/parameters/filterByIssueType"
+        - $ref: "#/components/parameters/filterByToolId"
+        - $ref: "#/components/parameters/filterBySubToolId"
+        - $ref: "#/components/parameters/filterByToolDomainServiceId"
+        - $ref: "#/components/parameters/filterByIssueClosedDate"
+        - $ref: "#/components/parameters/filterByIssueOpenedDate"
+        - $ref: "#/components/parameters/filterByTaxonomyId"
+        - $ref: "#/components/parameters/filterByTaxonomyType"
+        - name: group-by
+          in: query
+          required: false
+          description: "The group-by switch. To group counts by severity use: `[issue][severity]`. To group counts by Open/Closed status use: `[issue][status]`. Defaults to `[issue][status]`"
+          schema:
+            type: string
+        - name: start-date
+          in: query
+          required: false
+          description: "Get issue counts after this date, in ISO UTC for example: 1970-01-01T00:00:00.001Z. Defaults to the earliest revision date among all of the qualified revisions."
+          schema:
+            type: string
+        - name: end-date
+          in: query
+          required: false
+          description: "Get issue counts before this date, in ISO UTC for example: 1970-01-01T00:00:00.001Z. Defaults to now."
+          schema:
+            type: string
+        - name: granularity
+          in: query
+          required: false
+          description: The stride size to use for the counts.
+          schema:
+            type: string
+            enum:
+              - year
+              - month
+              - day
+              - hour
+            default: day
+        - name: response-timezone-offset
+          in: query
+          required: false
+          description: The timezone for the response, such as 'UTC' (default), 'GMT-6', 'GMT+1', etc
+          schema:
+            type: string
+            default: UTC
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IssueCountOverTimeResponse"
+      operationId: get_counts_issues_over_time
+  /issue-metrics/age:
+    get:
+      tags:
+        - IssueMetricsVersionOne
+      description: Returns average age of currently open or closed issues broken down by issue severity. The average age is reported in days and rounded up to the nearest integer.
+      parameters:
+        - name: project-id
+          in: query
+          required: true
+          description: The project to use.
+          schema:
+            type: string
+        - name: branch-id
+          in: query
+          required: true
+          description: The branch to use. Must belong to the requested project.
+          schema:
+            type: string
+        - name: metric
+          in: query
+          required: true
+          description: The metric `average-for-outstanding-issues` applies the average age calculation over currently open issues. The metric `average-for-resolved-issues` calculates the average time to resolution for currently closed (dismissed or resolved) issues.
+          schema:
+            type: string
+            enum:
+              - average-for-outstanding-issues
+              - average-for-resolved-issues
+        - name: include[issue-metrics-age]
+          in: query
+          required: false
+          description: Which related resource to include in the response.
+          schema:
+            type: string
+            enum:
+              - taxon
+        - name: page[offset]
+          in: query
+          required: false
+          description: Which page to view.  If this parameter is specified, then page[limit] must also be specified.
+          schema:
+            type: string
+        - name: page[limit]
+          in: query
+          required: true
+          description: The size of the page.  If this parameter is specified, then page[offset] must also be specified.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IssueMetricsAgeV1Response"
+      operationId: get_issue_metrics_age
+servers:
+  - url: //visma.cop.blackduck.com/api/query/v1
+components:
+  parameters:
+    filterByFindingKey:
+      name: filter[issue][finding-key][$eq]
+      in: query
+      description: Filter results by a specific finding key
+      required: false
+      schema:
+        type: string
+    filterByIssueKey:
+      name: filter[issue][issue-key][$eq]
+      in: query
+      description: Filter results by a specific issue key
+      required: false
+      schema:
+        type: string
+    filterByIssueType:
+      name: filter[issue][issue-type][$eq]
+      in: query
+      description: "Filter results by a specific issue type. For example: `null_pointer_dereference_exception:return_value|java`"
+      required: false
+      schema:
+        type: string
+    filterByToolId:
+      name: filter[issue][tool][id][$eq]
+      in: query
+      description: Filter results by a specific tool id
+      required: false
+      schema:
+        type: string
+    filterBySubToolId:
+      name: filter[issue][sub-tool][$eq]
+      in: query
+      description: Filter results by a specific subTool. For example `NULL_RETURNS`
+      required: false
+      schema:
+        type: string
+    filterByToolDomainServiceId:
+      name: filter[issue][tool-domain-service][id][$eq]
+      in: query
+      description: Filter results by a specific tool domain service id
+      required: false
+      schema:
+        type: string
+    filterByIssueStatus:
+      name: filter[issue][status][$eq]
+      in: query
+      description: Filter results based on whether the issue is open or not
+      required: false
+      schema:
+        type: string
+        enum:
+          - opened
+          - closed
+    filterByIssueClosedDate:
+      name: filter[issue][status-closed-date][$lte]
+      in: query
+      description: Filter results down to the issues that were closed before a given date. Value must be formatted as `YYYY-MM-DDThh:mm:ss.xZ` where x can be 0 to 9 digits long.
+      required: false
+      schema:
+        type: string
+    filterByIssueOpenedDate:
+      name: filter[issue][status-opened-date][$gte]
+      in: query
+      description: Filter results down to the issues that were opened after a given date. Value must be formatted as `YYYY-MM-DDThh:mm:ss.xZ` where x can be 0 to 9 digits long.
+      required: false
+      schema:
+        type: string
+    filterByIssueDismissed:
+      name: filter[issue][dismissed][$eq]
+      in: query
+      description: Filter results based on whether issues are dismissed or not
+      required: false
+      schema:
+        type: boolean
+        enum:
+          - true
+          - false
+    filterByTaxonomyId:
+      name: filter[issue][taxonomy][id][$eq]
+      in: query
+      description: Filter results based on whether issues appear in the given taxonomy or not. Taxonomy is identified by its id.
+      required: false
+      schema:
+        type: string
+    filterByTaxonomyType:
+      name: filter[issue][taxonomy][taxonomy-type][$eq]
+      in: query
+      description: Filter results based on whether issues appear in the given taxonomy or not. Taxonomy is identified by its type.
+      required: false
+      schema:
+        type: string
+        enum:
+          - cwe
+          - cwe-severity
+          - issue-kind
+          - on-the-cusp-2019
+          - on-the-cusp-2020
+          - owasp
+          - pci-dss
+          - recognized-priority-list
+          - sans-top-25-2019
+          - sans-top-25-2020
+          - severity
+          - technical-risk
+    filterByTriageOwner:
+      name: filter[issue][triage-owner][id][$eq]
+      in: query
+      description: Filter results based on the user that is assigned to the issue
+      required: false
+      schema:
+        type: string
+    filterByTriageStatus:
+      name: filter[issue][triage-status][$eq]
+      in: query
+      description: Filter results based on current triage status of issues
+      required: false
+      schema:
+        type: string
+        enum:
+          - not-triaged
+          - dismiss-requested
+          - to-be-fixed
+          - dismissed-false-positive
+          - dismissed-intentional
+          - dismissed-other
+    includeIssue:
+      name: include[issue][]
+      in: query
+      description: Include related resources in the request. path, tool-domain-service, tool, issue-type and transitions resources are automatically included
+      required: false
+      schema:
+        type: string
+        enum:
+          - reachability
+          - related-taxa
+          - related-indicators
+          - severity
+          - issue-kind
+  schemas:
+    JsonApiSelfLinks:
+      type: object
+      properties:
+        self:
+          type: object
+          properties:
+            href:
+              type: string
+            meta:
+              type: object
+              properties:
+                durable:
+                  type: string
+          required:
+            - href
+          description: An absolute URL to this resource.
+    JsonApiIncludedResourceV1:
+      type: object
+      discriminator:
+        propertyName: type
+      properties:
+        type:
+          type: string
+          description: "`Automatic`, `Non-null`.  The literal string indicating the type of the included JSON:API resource object."
+        id:
+          type: string
+          description: "`Automatic`, `Non-null`.  The unique identifier of this entity."
+    JsonApiResourceIdObject:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+      required:
+        - id
+        - type
+    IssueTypeIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Localized name of the issue-type.
+        description:
+          type: string
+          description: Localized description of the issue-type.
+        issue-type:
+          type: string
+          description: The issue-type semantic id.
+        abbreviation:
+          type: string
+          description: Localized abbreviation of the issue-type.
+        local-effect:
+          type: string
+          description: Localized local effect of the issue-type
+      required:
+        - name
+        - description
+        - issue-type
+    IssueTypeIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/IssueTypeIncludedV1Attributes"
+    TaxonIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Localized name of this taxon.
+        description:
+          type: string
+          description: "`Nullable`.  Localized description of this taxon."
+        abbreviation:
+          type: string
+          description: "`Nullable`.  Localized abbreviation of this taxon."
+        extra:
+          type: object
+          description: "`Nullable`.  Can contain additional information about the taxon, such as links to external reference material."
+          additionalProperties:
+            type: string
+      required:
+        - name
+        - description
+    TaxonIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/TaxonIncludedV1Attributes"
+    ToolDomainServiceIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Localized name of this tool domain service. Tool domains include Static Analysis Security Testing (SAST) and Software Composition Analysis (SCA).
+      required:
+        - name
+    ToolDomainServiceIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/ToolDomainServiceIncludedV1Attributes"
+    ToolIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the tool that found the issue (for example Coverity)
+        version:
+          type: string
+          description: The version of the tool (for example 2020.06)
+      required:
+        - name
+        - version
+    ToolIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/ToolIncludedV1Attributes"
+    SubToolIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the sub-tool
+      required:
+        - name
+    SubToolIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/SubToolIncludedV1Attributes"
+    ReachabilityIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Beta: Human readable string describing the reachability of the issue."
+      required:
+        - displayName
+    ReachabilityIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/ReachabilityIncludedV1Attributes"
+    TransitionIncludedV1Attributes:
+      type: object
+      properties:
+        transition-type:
+          type: string
+          description: "The transition type, either: 'opened' or 'closed'"
+        cause:
+          type: string
+          description: The probable cause of the transition, for example 'LEGACY', 'SUT_CHANGE'
+        human-readable-cause:
+          type: string
+          description: The human readable cause of the transition, for example 'This is a legacy issue found on the first known tool run'
+        transition-date:
+          type: string
+          description: The date when the transition was observed
+        branch-id:
+          type: string
+          description: The ID of the branch that this transition was observed on
+        revision-id:
+          type: string
+          description: The ID of the revision that this transition was observed on (optional)
+        run-id:
+          type: string
+          description: The ID of the run that this transition was observed on
+      required:
+        - transition-type
+        - cause
+        - branch-id
+        - run-id
+    TransitionIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/TransitionIncludedV1Attributes"
+    TriageOwnerIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the user that is assigned to the issue
+        username:
+          type: string
+          description: Username of the user that is assigned to the issue
+      required:
+        - name
+        - username
+    TriageOwnerIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/TriageOwnerIncludedV1Attributes"
+    TriageStatusIncludedV1Attributes:
+      type: object
+      properties:
+        label:
+          type: string
+          description: The description of the triage status.
+      required:
+        - label
+    TriageStatusIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/TriageStatusIncludedV1Attributes"
+    PathIncludedV1Attributes:
+      type: object
+      properties:
+        path:
+          type: array
+          description: The path as an array of string path elements.
+          items:
+            type: string
+        path-type:
+          type: string
+          description: The path type (ex. directory, packaged, etc...)
+        is-leaf:
+          type: boolean
+          description: Will be set to true if this path is a leaf
+    PathIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/PathIncludedV1Attributes"
+    ProjectIncludedV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the project
+        main-branch-id:
+          type: string
+          description: The main branch-id
+    ProjectIncludedV1:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        - required:
+            - attributes
+          properties:
+            attributes:
+              $ref: "#/components/schemas/ProjectIncludedV1Attributes"
+    ProjectV1:
+      type: object
+      description: A JSON:API resource identifier object for a project.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    PathV1:
+      type: object
+      description: A JSON:API resource identifier object for a file path. The file path describes where an issue was found when the project was analyzed.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    TaxonV1:
+      type: object
+      description: A JSON:API resource identifier object for Taxon.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    TaxonV1List:
+      type: object
+      description: A JSON:API resource identifier object for Taxon.
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    ToolDomainServiceV1:
+      type: object
+      description: A JSON:API resource identifier object for ToolDomainService
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    IssueTypeResourceId:
+      type: object
+      description: A JSON:API resource identifier object for IssueType.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    RunV1:
+      type: object
+      description: A JSON:API resource identifier object for run
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    TransitionV1:
+      type: object
+      description: A JSON:API resource identifier object for issue transition
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    ToolV1:
+      type: object
+      description: A JSON:API resource identifier object for tool
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    SubToolV1:
+      type: object
+      description: A JSON:API resource identifier object for a sub-tool. A sub-tool is the particular part of the analysis engine that found the issue. In Coverity for example, if an issue were found by the 'NULL_RETURNS' checker, that string would be used for the sub-tool of the issue.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    ReachabilityV1:
+      type: object
+      description: A JSON:API resource identifier object for reachability.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    TriageOwnerV1:
+      type: object
+      description: A JSON:API resource identifier object for triage owner. The triage owner provides the name and the username of the person who is assigned an issue via triage.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    TriageStatusV1:
+      type: object
+      description: A JSON:API resource identifier object for triage status.
+      properties:
+        data:
+          $ref: "#/components/schemas/JsonApiResourceIdObject"
+      required:
+        - data
+    CountV1Relationships:
+      type: object
+      description: Provides information related to the rollup-count query. For example, when grouping a taxon, the related taxon reference is provided so that additional information can be looked up.
+      properties:
+        path:
+          $ref: "#/components/schemas/PathV1"
+        project:
+          $ref: "#/components/schemas/ProjectV1"
+        parent:
+          $ref: "#/components/schemas/PathV1"
+        taxon:
+          $ref: "#/components/schemas/TaxonV1"
+        issue-type:
+          $ref: "#/components/schemas/IssueTypeResourceId"
+        tool-domain-service:
+          $ref: "#/components/schemas/ToolDomainServiceV1"
+        tool:
+          $ref: "#/components/schemas/ToolV1"
+        sub-tool:
+          $ref: "#/components/schemas/SubToolV1"
+        reachability:
+          $ref: "#/components/schemas/ReachabilityV1"
+        triage-owner:
+          $ref: "#/components/schemas/TriageOwnerV1"
+        triage-status:
+          $ref: "#/components/schemas/TriageStatusV1"
+      required:
+        - path
+    CountV1:
+      type: object
+      properties:
+        type:
+          type: string
+          default: count
+          description: "`Automatic`, `Non-null`. The literal-string `count`."
+        id:
+          type: string
+          description: "`Automatic`, `Non-null`. Transient, non-durable id."
+        attributes:
+          type: object
+          properties:
+            value:
+              type: integer
+              description: The count of issues that match the filter or group criteria requested
+        relationships:
+          $ref: "#/components/schemas/CountV1Relationships"
+    CountV1Resources:
+      type: object
+      description: A JSON representation of a path or paths count resource.
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountV1"
+        included:
+          description: "Included resources allow JSON:API clients to resolve the contents of related resources without making a separate HTTP request for those resources. By default, path and triage-owner resources are included with all requests. Additional resources can be included by using the include parameter in the request, for example: `include[issue][]=transitions,related-taxa,related-indicators,severity`"
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        meta:
+          $ref: "#/components/schemas/PagedQueryMetaV1"
+      required:
+        - data
+        - meta
+    IssueV1Relationships:
+      description: <p>Information that describes the issue discovered by the analysis tool. These terms are presented as JSON:API relationships so that information that is common between the issues in a given set can be de-duplicated and inter-related with JSON:API resource documents.</p>
+      "<p>Definition of the relationships:</p>\n<ul> <li>Issue type":
+        describes the issue that was found by the tool. Every issue must have an issue type.</li> <li>Tool domain service:
+          describes the tool that reported the issue, for example Coverity or Open Source Risk Analysis (OSRA).</li> <li>Tool:
+            identifies the tool that found the issue.</li> <li>Related taxa:
+              taxa that describe a category of the issue, for example if the issue is known to be part of the Common Weaknesses Enumeration (CWE) list it will be related to the appropriate taxa here.</li> <li>Related indicators:
+                taxa that describe a form of technical debt that, if left unmitigated, expose organizations to potential exploitations.</li> <li>Severity:
+                  a taxon that indicates the severity assigned by TDS for this issue. Severities can include taxa for Critical, High, Medium, Low, and Audit.</li> <li>Issue kind: a taxon that indicates the kind of issue that was reported by the tool, such as Quality or Security.</li>
+                  </ul>" type: object
+                  properties:
+                    issue-type:
+                      $ref: "#/components/schemas/IssueTypeResourceId"
+                    tool-domain-service:
+                      $ref: "#/components/schemas/ToolDomainServiceV1"
+                    tool:
+                      $ref: "#/components/schemas/ToolV1"
+                    path:
+                      $ref: "#/components/schemas/PathV1"
+                    latest-observed-on-run:
+                      $ref: "#/components/schemas/RunV1"
+                    transitions:
+                      $ref: "#/components/schemas/TransitionV1"
+                    related-taxa:
+                      $ref: "#/components/schemas/TaxonV1List"
+                    related-indicators:
+                      $ref: "#/components/schemas/TaxonV1List"
+                    severity:
+                      $ref: "#/components/schemas/TaxonV1"
+                    reachability:
+                      $ref: "#/components/schemas/ReachabilityV1"
+                    issue-kind:
+                      $ref: "#/components/schemas/TaxonV1"
+                  required:
+                    - issue-type
+                    - latest-observed-on-run
+                    - tool-domain-service
+                    - tool
+    IssueV1Attributes:
+      type: object
+      properties:
+        issue-key:
+          type: string
+          description: "`Automatic`.  The issue key that uniquely identifies the issue."
+        finding-key:
+          type: string
+          description: "`Automatic`.  The finding key assigned by the Tool Domain Service (TDS) for this issue. The finding key can be used to retrieve more details about a particular issue from this issue's TDS."
+        sub-tool:
+          type: string
+          description: Describes a more specific aspect of the tool that found the issue. For example, for issues found by Coverity, this will include the name of the checker that found the issue, such as 'RESOURCE_LEAK'.
+        severity:
+          type: string
+          deprecated: true
+          description: Deprecated. In v1 of the issue API, this field is not used and will always be `null`. See the severity relationship definition instead.
+      required:
+        - issue-key
+        - finding-key
+    IssueV1:
+      type: object
+      properties:
+        type:
+          type: string
+          default: issue
+          description: "`Automatic`, `Non-null`.  The literal string `issue`."
+        id:
+          type: string
+          description: "`Automatic`. `Non-null`.  The unique identifier of this entity."
+        attributes:
+          $ref: "#/components/schemas/IssueV1Attributes"
+        links:
+          $ref: "#/components/schemas/JsonApiSelfLinks"
+        relationships:
+          $ref: "#/components/schemas/IssueV1Relationships"
+      required:
+        - type
+        - id
+    IssueV1Resource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/IssueV1"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+      required:
+        - data
+    IssueV1Resources:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueV1"
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        meta:
+          $ref: "#/components/schemas/PagedQueryMetaV1"
+      required:
+        - data
+    StatusChangeCountResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: The number of issues that changed to the requested status in this 24-hour period.
+        transition-date:
+          type: string
+          description: The date-time that begins the 24-hour period that this count is for. In ISO UTC.
+      required:
+        - count
+        - transition-date
+    StatusCountResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          enum:
+            - Open
+            - Closed
+          description: Either Open, or Closed
+        data:
+          type: array
+          description: An array of tuples of corresponding dates and counts.
+          items:
+            type: array
+            description: A tuple containing a date and an issue count for the given date.
+            minItems: 2
+            maxItems: 2
+            items:
+              type: string
+      required:
+        - name
+        - data
+    IssueCountOverTimeResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          description: One of the [`Open`, `Closed`] values if counts are grouped by status. One of the [`low`, `medium`, `high`, `critical`, `audit`] if counts are grouped by severity.
+        data:
+          type: array
+          description: An array of tuples of corresponding dates and counts.
+          items:
+            type: array
+            description: A tuple containing a date and a count for the given date.
+            minItems: 2
+            maxItems: 2
+            items:
+              type: string
+      required:
+        - name
+        - data
+    IssueMetricsAgeV1Response:
+      type: object
+      description: A JSON representation of issues' average age broken down by taxa.
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueMetricsAgeV1"
+        included:
+          description: "Included resources allow JSON:API clients to resolve the contents of related resources without making a separate HTTP request for those resources. TO include taxa in the response, use the include parameter in the request: `include[issue-metrics-age]=taxon`"
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonApiIncludedResourceV1"
+        meta:
+          $ref: "#/components/schemas/PagedMetricMetaV1"
+      required:
+        - data
+        - meta
+    IssueMetricsAgeV1:
+      type: object
+      properties:
+        type:
+          type: string
+          default: issue-metrics-age
+          description: "`Automatic`, `Non-null`.  The literal string `issue-metrics-age`."
+        id:
+          type: string
+          description: "`Automatic`. `Non-null`.  The unique identifier of this entity."
+        attributes:
+          type: object
+          properties:
+            value:
+              type: integer
+              description: The average age of all issues qualified for this metric group.
+            unit:
+              type: string
+              default: days
+              description: The unit used to report average value.
+        relationships:
+          $ref: "#/components/schemas/IssueMetricsAgeV1Relationships"
+      required:
+        - type
+        - id
+    IssueMetricsAgeV1Relationships:
+      type: object
+      description: Provides information about the common denominator of all issues in this group.
+      properties:
+        taxon:
+          $ref: "#/components/schemas/TaxonV1"
+      required:
+        - taxon
+    GroupByV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The localized name of this group by attribute
+        value:
+          type: string
+          description: The value of this group by attribute to be used in the filter query parameters
+    GroupByV1:
+      type: object
+      properties:
+        type:
+          type: string
+          default: group-by
+          description: "`Automatic`, `Non-null`.  The literal string `group-by`."
+        id:
+          type: string
+          description: "`Automatic`. `Non-null`.  The unique identifier of this entity."
+        attributes:
+          $ref: "#/components/schemas/GroupByV1Attributes"
+    GroupByV1Resource:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupByV1"
+        meta:
+          $ref: "#/components/schemas/PagedMetaV1"
+    FilterKeyV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The localized name of this filter key
+        key:
+          type: string
+          description: The text key to use in query parameters
+        value-type:
+          type: string
+          description: Describes the type of filter key values, and how to obtain them. The types List and Dynamic indicate that these values can be fetched using '/&lt;keyid&gt;/values' endpoint while the types String, Date, DateTime, and Number indicate that the filter value takes a free-form text input of that type.
+        apis:
+          description: "Lists an array of sub-paths in the API where the provided issue filter keys can be used, for example: `[ '/v1/issues', '/v1/roll-up-counts' ]`"
+          type: array
+          items:
+            type: string
+    FilterKeyV1:
+      type: object
+      properties:
+        type:
+          type: string
+          default: filter-key
+          description: "`Automatic`, `Non-null`.  The literal string `filter-key`."
+        id:
+          type: string
+          description: "`Automatic`. `Non-null`.  The unique identifier of this entity."
+        attributes:
+          $ref: "#/components/schemas/FilterKeyV1Attributes"
+    FilterKeyV1Resource:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterKeyV1"
+        meta:
+          $ref: "#/components/schemas/PagedMetaV1"
+    FilterValueV1Attributes:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The natural language name of the filter value
+        value:
+          type: string
+          description: The value to use in filter query parameter expressions
+    FilterValueV1:
+      type: object
+      properties:
+        type:
+          type: string
+          default: filter-value
+          description: "`Automatic`, `Non-null`.  The literal string `filter-value`."
+        id:
+          type: string
+          description: "`Automatic`. `Non-null`.  The unique identifier of this entity."
+        attributes:
+          $ref: "#/components/schemas/FilterValueV1Attributes"
+    FilterValueV1Resource:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterValueV1"
+        meta:
+          $ref: "#/components/schemas/PagedMetaV1"
+    PagedMetaV1:
+      type: object
+      description: A JSON object with information about the paging of results that were returned.
+      properties:
+        offset:
+          type: integer
+          default: 0
+          description: The page offset of the response. This value can be set by the `page[offset]` parameter in the request.
+        limit:
+          type: integer
+          description: The size of the response page. This value can be set by the `page[limit]` parameter in the request.
+        total:
+          type: integer
+          description: The total size of the results available from the query.  `size` / `limit` = `pages`.
+      required:
+        - offset
+        - limit
+        - total
+    PagedQueryMetaV1:
+      allOf:
+        - $ref: "#/components/schemas/PagedMetaV1"
+        - properties:
+            group-by:
+              type: string
+              description: The string describing the relationship that the result is grouped-by.
+            complete:
+              type: boolean
+              description: Whether the response contained complete run information or not.  When the response is not complete, it should generally be retried at a later time.
+            run-count:
+              type: integer
+              description: The number of runs resolved based off the query.
+            latest-run-ids:
+              type: array
+              items:
+                type: string
+              description: List of the latest run ids of the tools used to find the issues that have been retrieved.
+    PagedMetricMetaV1:
+      allOf:
+        - $ref: "#/components/schemas/PagedMetaV1"
+        - properties:
+            has-runs:
+              type: boolean
+              description: Indicates whether the query was resolved to any run or not.

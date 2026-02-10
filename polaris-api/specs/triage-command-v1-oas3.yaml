@@ -1,0 +1,194 @@
+openapi: 3.0.0
+info:
+  version: V1
+  title: Triage Command Service
+  description: >
+    ## Description
+
+    This is a write-only web server that consumes triage-related commands. Triage Query Service is used to read triage values.
+tags:
+  - name: Triage Command
+paths:
+  /project-associations:
+    post:
+      tags:
+        - Triage Command
+      summary: Create project-associations Resource
+      description: Associate a Triage Store with the URN of a Project. The caller must
+        be authorized to modify the configuration of the project. <p> This
+        functionality will be removed in a future Polaris release.</p>
+      operationId: project-associations - save (Create project-associations Resource)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectAssociationsV1JsonApiResource"
+        description: ProjectAssociationsV1JsonApiResource
+      deprecated: true
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectAssociationsV1JsonApiResource"
+  /triage-issues:
+    post:
+      tags:
+        - Triage Command
+      summary: Create triage-issues Resource
+      description: Add triage to one or more issues for a particular project-id.
+      operationId: triage-issues - save (Create triage-issues Resource)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriageIssueV1JsonApiResource"
+        description: TriageIssueV1JsonApiResource
+      responses:
+        "201":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageIssueV1JsonApiResource"
+        "409":
+          description: Any modification to dismiss value when the dismiss-status of an
+            issue is 'REQUESTED'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+servers:
+  - url: https://visma.cop.blackduck.com/api/triage-command/v1
+components:
+  schemas:
+    ProjectAssociationsV1JsonApi:
+      type: object
+      properties:
+        attributes:
+          $ref: "#/components/schemas/ProjectAssociationsV1JsonApi_attributes"
+        id:
+          type: string
+          format: uuid
+        relationships:
+          $ref: "#/components/schemas/ProjectAssociationsV1JsonApi_relationships"
+        type:
+          type: string
+      description: A JSON:API resource that represents the link between a project and
+        a triage store.
+    ProjectAssociationsV1JsonApiResource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ProjectAssociationsV1JsonApi"
+      description: Resource container for ProjectAssociationsV1JsonApi
+    ProjectAssociationsV1JsonApi_attributes:
+      type: object
+      required:
+        - triage-store-id
+      properties:
+        project-urn:
+          type: string
+          description: The URN of the project associated to the triage store.
+        triage-store-id:
+          type: string
+          description: The ID uniquely identifying the triage store associated with the
+            project.
+          format: uuid
+      description: Attributes for ProjectAssociationsV1JsonApi
+    ProjectAssociationsV1JsonApi_relationships:
+      type: object
+      description: Relationships for ProjectAssociationsV1JsonApi
+    TriageIssueV1JsonApi:
+      type: object
+      properties:
+        attributes:
+          $ref: "#/components/schemas/TriageIssueV1JsonApi_attributes"
+        id:
+          type: string
+          format: uuid
+          description: ID uniquely identifying the action of triaging an issue.
+        relationships:
+          $ref: "#/components/schemas/TriageIssueV1JsonApi_relationships"
+        type:
+          type: string
+      description: The JSON:API resource for adding triage values for one or more issues.
+    TriageIssueV1JsonApiResource:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/TriageIssueV1JsonApi"
+        meta:
+          $ref: "#/components/schemas/TriageIssueV1JsonApiResourceMeta"
+      description: Resource container for TriageIssueV1JsonApi
+    TriageIssueV1JsonApiResourceMeta:
+      type: object
+      properties:
+        succeeded:
+          type: integer
+        failed:
+          type: integer
+        total:
+          type: integer
+      description: Represents how many issues were successful from a triage request.
+        An issue cannot be dismissed if it's currently in a REQUESTED state.
+    TriageIssueV1JsonApi_attributes:
+      type: object
+      required:
+        - triage-values
+      properties:
+        issue-keys:
+          type: array
+          description: The list of issue keys that identify the issues that have been
+            triaged.
+          items:
+            type: object
+        project-id:
+          type: string
+          description: The id of the project to which the issues belong.
+        dismissal-status:
+          type: string
+          description: >
+            The triage workflow status of an issue. Available options are:<br/>
+            REQUESTED - A dismiss is requested by a non admin user<br/>
+            SYSTEM_APPROVED - Default approval if workflow is off or an admin
+            dismisses<br/>
+        triage-values:
+          type: object
+          description: "A key-value mapping of the triage schema attributes, where both
+            the key and value are strings. The key must be a triage
+            attribute  ('OWNER', 'DISMISS' or 'COMMENTARY'). For example,
+            'DISMISS' : 'NOT_DISMISSED', where 'DISMISS' is the name of the
+            triage property and is the key, and 'NOT_DISMISSED' is the value of
+            that triage property."
+          additionalProperties:
+            type: object
+      description: Attributes for TriageIssueV1JsonApi
+    TriageIssueV1JsonApi_relationships:
+      type: object
+      description: Relationships for TriageIssueV1JsonApi
+    ErrorResponse:
+      type: object
+      properties:
+        errors:
+          $ref: "#/components/schemas/IterableErrorData"
+    IterableErrorData:
+      type: array
+      items:
+        $ref: "#/components/schemas/ErrorData"
+    ErrorData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "409"
+          description: State of the current request
+        title:
+          type: string
+          example: CONFLICT
+          description: Short description of the error condition
+        detail:
+          type: string
+          example: There is an active request for dismissal for this issue
+          description: Brief description for the cause of the error

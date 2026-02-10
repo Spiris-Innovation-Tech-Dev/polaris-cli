@@ -1,0 +1,3 @@
+[workspace]
+members = ["polaris-api", "polaris-cli"]
+resolver = "2"
