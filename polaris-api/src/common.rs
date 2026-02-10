@@ -24,24 +24,22 @@ pub struct PaginationMeta {
 impl<T> JsonApiResponse<T> {
     /// Returns true if there are more pages to fetch.
     pub fn has_more(&self) -> bool {
-        if let Some(meta) = &self.meta {
-            if let (Some(offset), Some(limit), Some(total)) = (meta.offset, meta.limit, meta.total)
-            {
-                return offset + limit < total;
-            }
+        if let Some(meta) = &self.meta
+            && let (Some(offset), Some(limit), Some(total)) = (meta.offset, meta.limit, meta.total)
+        {
+            return offset + limit < total;
         }
         false
     }
 
     /// Returns the offset for the next page, or None if no more pages.
     pub fn next_offset(&self) -> Option<u64> {
-        if let Some(meta) = &self.meta {
-            if let (Some(offset), Some(limit), Some(total)) = (meta.offset, meta.limit, meta.total)
-            {
-                let next = offset + limit;
-                if next < total {
-                    return Some(next);
-                }
+        if let Some(meta) = &self.meta
+            && let (Some(offset), Some(limit), Some(total)) = (meta.offset, meta.limit, meta.total)
+        {
+            let next = offset + limit;
+            if next < total {
+                return Some(next);
             }
         }
         None

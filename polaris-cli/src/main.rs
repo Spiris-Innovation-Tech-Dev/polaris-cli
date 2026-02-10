@@ -348,7 +348,7 @@ async fn main() -> Result<()> {
                         return Ok(());
                     }
                     println!("{} projects found.\n", resp.data.len());
-                    println!("{:<40} {:<40} {}", "ID", "NAME", "DESCRIPTION");
+                    println!("{:<40} {:<40} DESCRIPTION", "ID", "NAME");
                     println!("{}", "-".repeat(100));
                     for p in &resp.data {
                         println!(
@@ -389,7 +389,7 @@ async fn main() -> Result<()> {
                         return Ok(());
                     }
                     println!("{} branches found.\n", resp.data.len());
-                    println!("{:<40} {:<30} {}", "ID", "NAME", "MAIN");
+                    println!("{:<40} {:<30} MAIN", "ID", "NAME");
                     println!("{}", "-".repeat(80));
                     for b in &resp.data {
                         println!(
@@ -439,8 +439,8 @@ async fn main() -> Result<()> {
                     let included_map = build_included_map(&resp.included);
 
                     println!(
-                        "{:<12} {:<64} {:<20} {:<10} {}",
-                        "ID (short)", "ISSUE-KEY", "CHECKER", "SEVERITY", "TYPE"
+                        "{:<12} {:<64} {:<20} {:<10} TYPE",
+                        "ID (short)", "ISSUE-KEY", "CHECKER", "SEVERITY",
                     );
                     println!("{}", "-".repeat(130));
 
@@ -750,7 +750,7 @@ fn print_issue_detail(val: &serde_json::Value, base_url: &str, project_id: &str,
 
     // Resolve revision ID from included transition resource
     let revision_id = included
-        .map(|arr| {
+        .and_then(|arr| {
             arr.iter()
                 .filter(|inc| inc.get("type").and_then(|v| v.as_str()) == Some("transition"))
                 .filter_map(|inc| {
@@ -758,8 +758,7 @@ fn print_issue_detail(val: &serde_json::Value, base_url: &str, project_id: &str,
                         .and_then(|v| v.as_str())
                 })
                 .next()
-        })
-        .flatten();
+        });
 
     // Build path query param from included path resource
     let path_query = path_val
@@ -952,10 +951,10 @@ fn print_events_recursive(events: &[serde_json::Value], indent: usize) {
         }
 
         // Recurse into evidence events
-        if let Some(children) = evt.get("evidence-events").and_then(|v| v.as_array()) {
-            if !children.is_empty() {
-                print_events_recursive(children, indent + 1);
-            }
+        if let Some(children) = evt.get("evidence-events").and_then(|v| v.as_array())
+            && !children.is_empty()
+        {
+            print_events_recursive(children, indent + 1);
         }
     }
 }

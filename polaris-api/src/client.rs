@@ -121,10 +121,8 @@ impl PolarisClient {
                 break;
             }
             offset += page_size;
-            if let Some(t) = total {
-                if offset as u64 >= t {
-                    break;
-                }
+            if let Some(t) = total && offset as u64 >= t {
+                break;
             }
         }
 
@@ -173,10 +171,8 @@ impl PolarisClient {
                 break;
             }
             offset += page_size;
-            if let Some(t) = total {
-                if offset as u64 >= t {
-                    break;
-                }
+            if let Some(t) = total && offset as u64 >= t {
+                break;
             }
         }
 
@@ -253,10 +249,8 @@ impl PolarisClient {
                 break;
             }
             offset += page_size;
-            if let Some(t) = total {
-                if offset as u64 >= t {
-                    break;
-                }
+            if let Some(t) = total && offset as u64 >= t {
+                break;
             }
         }
 

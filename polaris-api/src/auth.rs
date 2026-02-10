@@ -8,7 +8,6 @@ pub struct AuthenticateResponse {
 
 /// Request body is application/x-www-form-urlencoded with `accesstoken` field.
 /// The response returns a JWT in the body for API token auth.
-
 pub struct AuthClient {
     http: reqwest::Client,
     base_url: String,
