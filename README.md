@@ -2,6 +2,12 @@
 
 Rust workspace providing an API library crate and CLI client for the [BlackDuck Coverity on Polaris](https://your-instance.polaris.blackduck.com) platform. Query projects, browse issues with source code context, manage triage — all from the terminal.
 
+## Install as Claude Code Skill
+
+```bash
+npx skills add Spiris-Innovation-Tech-Dev/polaris-cli -g -a claude-code -y
+```
+
 ## Quick Start
 
 ```bash
