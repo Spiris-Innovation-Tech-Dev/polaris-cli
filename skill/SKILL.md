@@ -15,7 +15,13 @@ CLI for querying BlackDuck Coverity on Polaris.
 
 ## Setup
 
-The `polaris` binary is bundled at `scripts/polaris`. All commands below use this wrapper.
+If `bin/polaris` is missing, run the install script first:
+```bash
+scripts/install.sh
+```
+This downloads the correct platform binary from GitHub Releases (requires `gh` CLI).
+
+The wrapper at `scripts/polaris` calls `bin/polaris`. All commands below use this wrapper.
 
 ## Output Format
 
