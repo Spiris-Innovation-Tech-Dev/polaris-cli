@@ -12,10 +12,29 @@ permissions:
   contents: write
 
 jobs:
+  check:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
   build:
     name: Build (${{ matrix.target }})
+    needs: check
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -44,19 +63,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-          components: clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Install Cross
         if: matrix.use_cross == true
         run: cargo install cross --git https://github.com/cross-rs/cross --locked
 
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Run tests
-        run: cargo test --workspace
-
-      - name: Build release binary
+      - name: Build release binary (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           if [[ "${{ matrix.use_cross }}" == "true" ]]; then
@@ -65,42 +83,28 @@ jobs:
             cargo build --release --target ${{ matrix.target }} -p polaris-cli
           fi
 
-      - name: Package binary
+      - name: Build release binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --release --target '${{ matrix.target }}' -p polaris-cli
+
+      - name: Package skill release
         shell: bash
         run: |
-          cd target/${{ matrix.target }}/release
-
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            BIN="polaris.exe"
-            EXT="zip"
-          else
-            BIN="polaris"
-            EXT="tar.gz"
+          VERSION="${GITHUB_REF_NAME}"
+          if [[ "${VERSION}" != v* ]]; then
+            VERSION="v0.0.0-dev"
           fi
-
-          case "${{ matrix.target }}" in
-            x86_64-unknown-linux-musl) PLATFORM="linux-amd64" ;;
-            aarch64-unknown-linux-musl) PLATFORM="linux-arm64" ;;
-            x86_64-pc-windows-msvc) PLATFORM="windows-amd64" ;;
-            aarch64-pc-windows-msvc) PLATFORM="windows-arm64" ;;
-            x86_64-apple-darwin) PLATFORM="macos-amd64" ;;
-            aarch64-apple-darwin) PLATFORM="macos-arm64" ;;
-          esac
-
-          if [ "$EXT" == "zip" ]; then
-            7z a ../../../polaris-${PLATFORM}.zip $BIN
-          else
-            tar -czf ../../../polaris-${PLATFORM}.tar.gz $BIN
-          fi
-
-          cd ../../../
-          echo "ASSET=polaris-${PLATFORM}.${EXT}" >> $GITHUB_ENV
+          ARCHIVE_PATH="$(./scripts/release/package.sh "${VERSION}" "${{ matrix.target }}" "release-assets")"
+          echo "ASSET_PATH=${ARCHIVE_PATH}" >> "$GITHUB_ENV"
+          ls -lh "${ARCHIVE_PATH}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: polaris-${{ matrix.target }}
-          path: ${{ env.ASSET }}
+          name: polaris-cli-${{ matrix.target }}
+          path: ${{ env.ASSET_PATH }}
           if-no-files-found: error
 
   create_release:
@@ -143,17 +147,22 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: polaris-cli-*
+          merge-multiple: true
+          path: release-assets
 
-      - name: List artifacts
-        run: ls -R artifacts
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          sha256sum * > checksums.txt
+          cat checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.determine_version.outputs.new_version }}
           name: Release v${{ steps.determine_version.outputs.new_version }}
-          files: artifacts/*/*
+          files: release-assets/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
