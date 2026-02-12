@@ -34,16 +34,27 @@ scripts/polaris --toon <command> [options]
 
 ## Authentication
 
-Token resolution order: `--api-token` flag > `POLARIS_API_TOKEN` env var > OS keychain.
+Before any command will work, an API token must be available. Resolution order:
+1. `--api-token` flag
+2. `POLARIS_API_TOKEN` environment variable
+3. OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager)
 
-Store token in keychain:
+**First-time setup:** Get an API token from the Polaris web UI (user settings > API tokens),
+then store it in the OS keychain so it persists across sessions:
 ```bash
 scripts/polaris auth login --token <TOKEN>
 ```
+The token is verified before being stored. If login fails, the token is invalid.
 
-Check auth status:
+**If auth errors occur**, check the current state:
 ```bash
 scripts/polaris auth status --toon
+```
+This shows which sources have a token and which one is active.
+
+**Remove stored token:**
+```bash
+scripts/polaris auth logout
 ```
 
 ## Commands
