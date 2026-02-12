@@ -111,10 +111,10 @@ $POLARIS triage get --toon --project-id <PROJECT_UUID> --issue-key <ISSUE_KEY>
 Update triage (at least one of `--dismiss`, `--owner`, `--comment` required):
 ```bash
 $POLARIS triage update --toon --project-id <PID> --issue-keys <KEY1>,<KEY2> \
-  --dismiss DISMISSED_AS_FP --comment "False positive: checked manually"
+  --dismiss DISMISSED_FALSE_POSITIVE --comment "False positive: checked manually"
 ```
 
-Dismiss values: `NOT_DISMISSED`, `DISMISSED_BY_DESIGN`, `DISMISSED_AS_FP`.
+Dismiss values: `NOT_DISMISSED`, `DISMISSED_FALSE_POSITIVE`, `DISMISSED_INTENTIONAL`, `DISMISSED_OTHER`, `TO_BE_FIXED`.
 
 View triage history:
 ```bash
@@ -127,7 +127,7 @@ $POLARIS triage history --toon --project-id <PROJECT_UUID> --issue-key <ISSUE_KE
 2. List issues on main branch: `$POLARIS issues --toon --project-id <PID>`
 3. Inspect a specific issue: `$POLARIS issue --toon --issue-id <IID> --project-id <PID>`
 4. View full event tree if needed: `$POLARIS events --toon --finding-key <FK> --run-id <RID>`
-5. Triage: `$POLARIS triage update --toon --project-id <PID> --issue-keys <IK> --dismiss DISMISSED_AS_FP`
+5. Triage: `$POLARIS triage update --toon --project-id <PID> --issue-keys <IK> --dismiss DISMISSED_FALSE_POSITIVE`
 
 ## Global Options
 

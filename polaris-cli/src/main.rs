@@ -172,7 +172,7 @@ enum TriageAction {
         #[arg(long, value_delimiter = ',')]
         issue_keys: Vec<String>,
 
-        /// Dismiss value (e.g. NOT_DISMISSED, DISMISSED_BY_DESIGN, DISMISSED_AS_FP)
+        /// Dismiss value (NOT_DISMISSED, DISMISSED_FALSE_POSITIVE, DISMISSED_INTENTIONAL, DISMISSED_OTHER, TO_BE_FIXED)
         #[arg(long)]
         dismiss: Option<String>,
 
