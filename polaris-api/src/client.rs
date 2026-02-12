@@ -206,16 +206,17 @@ impl PolarisClient {
         let http = self.authed_http(&jwt)?;
 
         let mut url = format!(
-            "{}/api/query/v1/issues?project-id={project_id}&page[limit]={limit}&page[offset]={offset}",
-            self.config.base_url
+            "{}/api/query/v1/issues?project-id={}&page[limit]={limit}&page[offset]={offset}",
+            self.config.base_url,
+            urlencoding::encode(project_id),
         );
 
         if let Some(bid) = branch_id {
-            url.push_str(&format!("&branch-id={bid}"));
+            url.push_str(&format!("&branch-id={}", urlencoding::encode(bid)));
         }
         if let Some(rids) = run_ids {
             for rid in rids {
-                url.push_str(&format!("&run-id[]={rid}"));
+                url.push_str(&format!("&run-id[]={}", urlencoding::encode(rid)));
             }
         }
 
@@ -280,8 +281,11 @@ impl PolarisClient {
         let http = self.authed_http(&jwt)?;
 
         let url = format!(
-            "{}/api/query/v1/issues/{issue_id}?project-id={project_id}&branch-id={branch_id}&include[issue][]=severity&include[issue][]=issue-type&include[issue][]=tool-domain-service&include[issue][]=path&include[issue][]=transitions",
-            self.config.base_url
+            "{}/api/query/v1/issues/{}?project-id={}&branch-id={}&include[issue][]=severity&include[issue][]=issue-type&include[issue][]=tool-domain-service&include[issue][]=path&include[issue][]=transitions",
+            self.config.base_url,
+            urlencoding::encode(issue_id),
+            urlencoding::encode(project_id),
+            urlencoding::encode(branch_id),
         );
 
         let resp = http.get(&url).send().await?;
@@ -302,8 +306,10 @@ impl PolarisClient {
         let http = self.authed_http(&jwt)?;
 
         let mut url = format!(
-            "{}/api/code-analysis/v0/events-with-source?finding-key={finding_key}&run-id={run_id}",
-            self.config.base_url
+            "{}/api/code-analysis/v0/events-with-source?finding-key={}&run-id={}",
+            self.config.base_url,
+            urlencoding::encode(finding_key),
+            urlencoding::encode(run_id),
         );
         if let Some(occ) = occurrence_number {
             url.push_str(&format!("&occurrence-number={occ}"));
@@ -331,8 +337,10 @@ impl PolarisClient {
         let http = self.authed_http(&jwt)?;
 
         let url = format!(
-            "{}/api/code-analysis/v0/source-code?run-id={run_id}&path={path}",
-            self.config.base_url
+            "{}/api/code-analysis/v0/source-code?run-id={}&path={}",
+            self.config.base_url,
+            urlencoding::encode(run_id),
+            urlencoding::encode(path),
         );
 
         let resp = http
@@ -363,8 +371,10 @@ impl PolarisClient {
         let http = self.authed_http(&jwt)?;
 
         let url = format!(
-            "{}/api/triage-query/v1/triage-current?filter[triage-current][project-id][$eq]={project_id}&filter[triage-current][issue-key][$eq]={issue_key}",
-            self.config.base_url
+            "{}/api/triage-query/v1/triage-current?filter[triage-current][project-id][$eq]={}&filter[triage-current][issue-key][$eq]={}",
+            self.config.base_url,
+            urlencoding::encode(project_id),
+            urlencoding::encode(issue_key),
         );
 
         let resp = http.get(&url).send().await?;
@@ -430,8 +440,10 @@ impl PolarisClient {
         let http = self.authed_http(&jwt)?;
 
         let url = format!(
-            "{}/api/triage-query/v1/triage-history-items?filter[triage-history-items][project-id][$eq]={project_id}&filter[triage-history-items][issue-key][$eq]={issue_key}&page[limit]={limit}&page[offset]={offset}",
-            self.config.base_url
+            "{}/api/triage-query/v1/triage-history-items?filter[triage-history-items][project-id][$eq]={}&filter[triage-history-items][issue-key][$eq]={}&page[limit]={limit}&page[offset]={offset}",
+            self.config.base_url,
+            urlencoding::encode(project_id),
+            urlencoding::encode(issue_key),
         );
 
         let resp = http.get(&url).send().await?;

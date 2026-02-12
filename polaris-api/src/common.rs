@@ -168,8 +168,9 @@ impl CommonClient {
         offset: u32,
     ) -> crate::error::Result<JsonApiResponse<Branch>> {
         let url = format!(
-            "{}/api/common/v0/branches?filter[branch][project][id][$eq]={project_id}&page[limit]={limit}&page[offset]={offset}",
-            self.base_url
+            "{}/api/common/v0/branches?filter[branch][project][id][$eq]={}&page[limit]={limit}&page[offset]={offset}",
+            self.base_url,
+            urlencoding::encode(project_id),
         );
 
         let resp = self.http.get(&url).send().await?;
@@ -185,12 +186,13 @@ impl CommonClient {
         offset: u32,
     ) -> crate::error::Result<JsonApiResponse<Run>> {
         let mut url = format!(
-            "{}/api/common/v0/runs?filter[run][project][id][$eq]={project_id}&page[limit]={limit}&page[offset]={offset}",
-            self.base_url
+            "{}/api/common/v0/runs?filter[run][project][id][$eq]={}&page[limit]={limit}&page[offset]={offset}",
+            self.base_url,
+            urlencoding::encode(project_id),
         );
 
         if let Some(rev) = revision_id {
-            url.push_str(&format!("&filter[run][revision][id][$eq]={rev}"));
+            url.push_str(&format!("&filter[run][revision][id][$eq]={}", urlencoding::encode(rev)));
         }
 
         let resp = self.http.get(&url).send().await?;
