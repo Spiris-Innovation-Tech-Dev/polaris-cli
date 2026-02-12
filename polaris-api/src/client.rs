@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use zeroize::Zeroizing;
 
 use crate::auth::AuthClient;
 use crate::common::{CommonClient, JsonApiResponse, Project, Branch};
@@ -29,7 +30,7 @@ impl PolarisConfig {
 pub struct PolarisClient {
     config: PolarisConfig,
     auth: AuthClient,
-    jwt: Arc<RwLock<Option<String>>>,
+    jwt: Arc<RwLock<Option<Zeroizing<String>>>>,
 }
 
 impl PolarisClient {
@@ -48,7 +49,7 @@ impl PolarisClient {
             .auth
             .authenticate_with_token(&self.config.api_token)
             .await?;
-        *self.jwt.write().await = Some(jwt.clone());
+        *self.jwt.write().await = Some(Zeroizing::new(jwt.clone()));
         Ok(jwt)
     }
 
@@ -57,30 +58,33 @@ impl PolarisClient {
         {
             let jwt = self.jwt.read().await;
             if let Some(ref j) = *jwt {
-                return Ok(j.clone());
+                return Ok((**j).clone());
             }
         }
         self.authenticate().await
     }
 
-    fn common_client(&self, jwt: &str) -> CommonClient {
+    fn common_client(&self, jwt: &str) -> Result<CommonClient> {
         CommonClient::new(&self.config.base_url, jwt)
     }
 
-    fn authed_http(&self, jwt: &str) -> reqwest::Client {
+    fn authed_http(&self, jwt: &str) -> Result<reqwest::Client> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::AUTHORIZATION,
-            format!("Bearer {jwt}").parse().unwrap(),
+            reqwest::header::HeaderValue::from_str(&format!("Bearer {jwt}"))
+                .map_err(|e| PolarisError::Other(format!("invalid header value: {e}")))?,
         );
         headers.insert(
             reqwest::header::ACCEPT,
-            "application/vnd.api+json".parse().unwrap(),
+            reqwest::header::HeaderValue::from_static("application/vnd.api+json"),
         );
         reqwest::Client::builder()
             .default_headers(headers)
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(30))
             .build()
-            .unwrap()
+            .map_err(PolarisError::Http)
     }
 
     // ── Projects ──
@@ -93,7 +97,7 @@ impl PolarisClient {
         offset: u32,
     ) -> Result<JsonApiResponse<Project>> {
         let jwt = self.get_jwt().await?;
-        self.common_client(&jwt)
+        self.common_client(&jwt)?
             .list_projects(name_filter, limit, offset)
             .await
     }
@@ -145,7 +149,7 @@ impl PolarisClient {
         offset: u32,
     ) -> Result<JsonApiResponse<Branch>> {
         let jwt = self.get_jwt().await?;
-        self.common_client(&jwt)
+        self.common_client(&jwt)?
             .list_branches(project_id, limit, offset)
             .await
     }
@@ -199,7 +203,7 @@ impl PolarisClient {
         offset: u32,
     ) -> Result<IssuesResponse> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let mut url = format!(
             "{}/api/query/v1/issues?project-id={project_id}&page[limit]={limit}&page[offset]={offset}",
@@ -273,7 +277,7 @@ impl PolarisClient {
         branch_id: &str,
     ) -> Result<serde_json::Value> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let url = format!(
             "{}/api/query/v1/issues/{issue_id}?project-id={project_id}&branch-id={branch_id}&include[issue][]=severity&include[issue][]=issue-type&include[issue][]=tool-domain-service&include[issue][]=path&include[issue][]=transitions",
@@ -295,7 +299,7 @@ impl PolarisClient {
         max_depth: Option<u32>,
     ) -> Result<serde_json::Value> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let mut url = format!(
             "{}/api/code-analysis/v0/events-with-source?finding-key={finding_key}&run-id={run_id}",
@@ -324,7 +328,7 @@ impl PolarisClient {
         path: &str,
     ) -> Result<String> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let url = format!(
             "{}/api/code-analysis/v0/source-code?run-id={run_id}&path={path}",
@@ -356,7 +360,7 @@ impl PolarisClient {
         issue_key: &str,
     ) -> Result<TriageCurrentResponse> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let url = format!(
             "{}/api/triage-query/v1/triage-current?filter[triage-current][project-id][$eq]={project_id}&filter[triage-current][issue-key][$eq]={issue_key}",
@@ -375,7 +379,7 @@ impl PolarisClient {
         triage_values: &TriageValues,
     ) -> Result<serde_json::Value> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let url = format!(
             "{}/api/triage-command/v1/triage-issues",
@@ -423,7 +427,7 @@ impl PolarisClient {
         offset: u32,
     ) -> Result<serde_json::Value> {
         let jwt = self.get_jwt().await?;
-        let http = self.authed_http(&jwt);
+        let http = self.authed_http(&jwt)?;
 
         let url = format!(
             "{}/api/triage-query/v1/triage-history-items?filter[triage-history-items][project-id][$eq]={project_id}&filter[triage-history-items][issue-key][$eq]={issue_key}&page[limit]={limit}&page[offset]={offset}",

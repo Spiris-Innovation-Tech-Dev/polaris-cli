@@ -1,3 +1,5 @@
+#![warn(clippy::unwrap_used, clippy::expect_used)]
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use polaris_api::client::{PolarisClient, PolarisConfig, TriageValues};
