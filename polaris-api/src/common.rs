@@ -109,26 +109,29 @@ pub struct CommonClient {
 }
 
 impl CommonClient {
-    pub fn new(base_url: &str, jwt: &str) -> Self {
+    pub fn new(base_url: &str, jwt: &str) -> crate::error::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::AUTHORIZATION,
-            format!("Bearer {jwt}").parse().unwrap(),
+            reqwest::header::HeaderValue::from_str(&format!("Bearer {jwt}"))
+                .map_err(|e| crate::error::PolarisError::Other(format!("invalid header value: {e}")))?,
         );
         headers.insert(
             reqwest::header::ACCEPT,
-            "application/vnd.api+json".parse().unwrap(),
+            reqwest::header::HeaderValue::from_static("application/vnd.api+json"),
         );
 
         let http = reqwest::Client::builder()
             .default_headers(headers)
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(30))
             .build()
-            .unwrap();
+            .map_err(crate::error::PolarisError::Http)?;
 
-        Self {
+        Ok(Self {
             http,
             base_url: base_url.trim_end_matches('/').to_string(),
-        }
+        })
     }
 
     /// List projects, optionally filtering by name.

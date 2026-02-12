@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 /// Response from POST /api/auth/v2/authenticate
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AuthenticateResponse {
     pub jwt: String,
 }
