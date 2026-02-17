@@ -449,6 +449,127 @@ impl PolarisClient {
         let resp = http.get(&url).send().await?;
         check_response(resp).await
     }
+
+    // ── Metrics & Discovery ──
+
+    /// Get roll-up counts of issues, optionally grouped by a field.
+    pub async fn get_roll_up_counts(
+        &self,
+        project_id: &str,
+        branch_id: Option<&str>,
+        group_by: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        let jwt = self.get_jwt().await?;
+        let http = self.authed_http(&jwt)?;
+
+        let mut url = format!(
+            "{}/api/query/v1/roll-up-counts?project-id={}&page[limit]=100",
+            self.config.base_url,
+            urlencoding::encode(project_id),
+        );
+        if let Some(bid) = branch_id {
+            url.push_str(&format!("&branch-id={}", urlencoding::encode(bid)));
+        }
+        if let Some(gb) = group_by {
+            url.push_str(&format!("&group-by={}", urlencoding::encode(gb)));
+        }
+
+        let resp = http.get(&url).send().await?;
+        check_response(resp).await
+    }
+
+    /// Get issue counts over time, grouped by status or severity.
+    pub async fn get_issues_over_time(
+        &self,
+        project_id: &str,
+        branch_id: Option<&str>,
+        group_by: Option<&str>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        granularity: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        let jwt = self.get_jwt().await?;
+        let http = self.authed_http(&jwt)?;
+
+        let mut url = format!(
+            "{}/api/query/v1/counts/issues-over-time?project-id={}",
+            self.config.base_url,
+            urlencoding::encode(project_id),
+        );
+        if let Some(bid) = branch_id {
+            url.push_str(&format!("&branch-id={}", urlencoding::encode(bid)));
+        }
+        if let Some(gb) = group_by {
+            url.push_str(&format!("&group-by={}", urlencoding::encode(gb)));
+        }
+        if let Some(sd) = start_date {
+            url.push_str(&format!("&start-date={}", urlencoding::encode(sd)));
+        }
+        if let Some(ed) = end_date {
+            url.push_str(&format!("&end-date={}", urlencoding::encode(ed)));
+        }
+        if let Some(g) = granularity {
+            url.push_str(&format!("&granularity={}", urlencoding::encode(g)));
+        }
+
+        let resp = http
+            .get(&url)
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+        check_response(resp).await
+    }
+
+    /// Get issue age metrics (average for outstanding or resolved issues).
+    pub async fn get_issue_age(
+        &self,
+        project_id: &str,
+        branch_id: &str,
+        metric: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        let jwt = self.get_jwt().await?;
+        let http = self.authed_http(&jwt)?;
+
+        let metric_val = metric.unwrap_or("average-for-outstanding-issues");
+        let url = format!(
+            "{}/api/query/v1/issue-metrics/age?project-id={}&branch-id={}&metric={}&include[issue-metrics-age]=taxon&page[limit]=100",
+            self.config.base_url,
+            urlencoding::encode(project_id),
+            urlencoding::encode(branch_id),
+            urlencoding::encode(metric_val),
+        );
+
+        let resp = http.get(&url).send().await?;
+        check_response(resp).await
+    }
+
+    /// Get available filter keys for issue queries.
+    pub async fn get_filter_keys(&self) -> Result<serde_json::Value> {
+        let jwt = self.get_jwt().await?;
+        let http = self.authed_http(&jwt)?;
+
+        let url = format!(
+            "{}/api/query/v1/discovery/filter-keys",
+            self.config.base_url,
+        );
+
+        let resp = http.get(&url).send().await?;
+        check_response(resp).await
+    }
+
+    /// Get available group-by values for issue queries.
+    pub async fn get_group_bys(&self) -> Result<serde_json::Value> {
+        let jwt = self.get_jwt().await?;
+        let http = self.authed_http(&jwt)?;
+
+        let url = format!(
+            "{}/api/query/v1/discovery/group-bys",
+            self.config.base_url,
+        );
+
+        let resp = http.get(&url).send().await?;
+        check_response(resp).await
+    }
 }
 
 // ── Response types ──

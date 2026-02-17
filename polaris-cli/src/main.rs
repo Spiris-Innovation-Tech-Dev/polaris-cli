@@ -147,6 +147,70 @@ enum Commands {
         #[command(subcommand)]
         action: TriageAction,
     },
+
+    /// Issue roll-up counts (grouped by severity, issue-type, etc.)
+    Counts {
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+
+        /// Branch ID (optional, uses all branches if omitted)
+        #[arg(long)]
+        branch_id: Option<String>,
+
+        /// Group by field (e.g. severity, issue-type, sub-tool)
+        #[arg(long)]
+        group_by: Option<String>,
+    },
+
+    /// Issue count trends over time
+    Trends {
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+
+        /// Branch ID
+        #[arg(long)]
+        branch_id: Option<String>,
+
+        /// Group by field (status or severity)
+        #[arg(long)]
+        group_by: Option<String>,
+
+        /// Time granularity (year, month, day, hour)
+        #[arg(long)]
+        granularity: Option<String>,
+
+        /// Start date (ISO UTC, e.g. 2025-01-01)
+        #[arg(long)]
+        start_date: Option<String>,
+
+        /// End date (ISO UTC, e.g. 2025-12-31)
+        #[arg(long)]
+        end_date: Option<String>,
+    },
+
+    /// Issue age metrics
+    Age {
+        /// Project ID
+        #[arg(long)]
+        project_id: String,
+
+        /// Branch ID
+        #[arg(long)]
+        branch_id: Option<String>,
+
+        /// Metric type: outstanding or resolved
+        #[arg(long)]
+        metric: Option<String>,
+    },
+
+    /// Discovery endpoints (filter-keys, group-bys)
+    Discovery {
+        /// Type of discovery data: filter-keys or group-bys
+        #[arg(long, rename_all = "kebab-case")]
+        r#type: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -540,6 +604,175 @@ async fn main() -> Result<()> {
                     print_event_tree(&events);
                 }
                 _ => emit(&events, &fmt)?,
+            }
+        }
+
+        Commands::Counts {
+            project_id,
+            branch_id,
+            group_by,
+        } => {
+            let branch_id = resolve_branch(&client, &project_id, branch_id).await?;
+
+            let resp = client
+                .get_roll_up_counts(
+                    &project_id,
+                    Some(&branch_id),
+                    group_by.as_deref(),
+                )
+                .await
+                .context("Failed to get roll-up counts")?;
+
+            match fmt {
+                OutputFormat::Pretty => {
+                    if let Some(data) = resp.get("data").and_then(|v| v.as_array()) {
+                        if data.is_empty() {
+                            println!("No counts found.");
+                        } else {
+                            println!("{:<40} COUNT", "GROUP");
+                            println!("{}", "-".repeat(50));
+                            for item in data {
+                                let name = item
+                                    .pointer("/attributes/name")
+                                    .or_else(|| item.pointer("/attributes/value"))
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("-");
+                                let count = item
+                                    .pointer("/attributes/count")
+                                    .or_else(|| item.pointer("/attributes/value"))
+                                    .and_then(|v| v.as_u64())
+                                    .map(|n| n.to_string())
+                                    .unwrap_or_else(|| "-".to_string());
+                                println!("{:<40} {}", name, count);
+                            }
+                        }
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&resp)?);
+                    }
+                }
+                _ => emit(&resp, &fmt)?,
+            }
+        }
+
+        Commands::Trends {
+            project_id,
+            branch_id,
+            group_by,
+            granularity,
+            start_date,
+            end_date,
+        } => {
+            let branch_id = resolve_branch(&client, &project_id, branch_id).await?;
+
+            let resp = client
+                .get_issues_over_time(
+                    &project_id,
+                    Some(&branch_id),
+                    group_by.as_deref(),
+                    start_date.as_deref(),
+                    end_date.as_deref(),
+                    granularity.as_deref(),
+                )
+                .await
+                .context("Failed to get issues over time")?;
+
+            match fmt {
+                OutputFormat::Pretty => {
+                    if let Some(data) = resp.get("data").and_then(|v| v.as_array()) {
+                        if data.is_empty() {
+                            println!("No trend data found.");
+                        } else {
+                            for series in data {
+                                let name = series
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("-");
+                                println!("Series: {name}");
+                                if let Some(points) = series.get("data").and_then(|v| v.as_array()) {
+                                    for point in points {
+                                        if let Some(arr) = point.as_array() {
+                                            let date = arr.first().and_then(|v| v.as_str()).unwrap_or("-");
+                                            let count = arr.get(1).and_then(|v| v.as_u64()).map(|n| n.to_string()).unwrap_or_else(|| "-".to_string());
+                                            println!("  {date}: {count}");
+                                        }
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&resp)?);
+                    }
+                }
+                _ => emit(&resp, &fmt)?,
+            }
+        }
+
+        Commands::Age {
+            project_id,
+            branch_id,
+            metric,
+        } => {
+            let branch_id = resolve_branch(&client, &project_id, branch_id).await?;
+
+            let api_metric = metric.as_deref().map(|m| match m {
+                "outstanding" => "average-for-outstanding-issues",
+                "resolved" => "average-for-resolved-issues",
+                other => other,
+            });
+
+            let resp = client
+                .get_issue_age(&project_id, &branch_id, api_metric)
+                .await
+                .context("Failed to get issue age metrics")?;
+
+            match fmt {
+                OutputFormat::Pretty => {
+                    if let Some(data) = resp.get("data").and_then(|v| v.as_array()) {
+                        if data.is_empty() {
+                            println!("No age data found.");
+                        } else {
+                            for item in data {
+                                let age = item
+                                    .pointer("/attributes/age")
+                                    .and_then(|v| v.as_f64())
+                                    .map(|d| format!("{:.1} days", d))
+                                    .unwrap_or_else(|| "-".to_string());
+                                let taxon = item
+                                    .pointer("/attributes/name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("-");
+                                println!("Average age ({taxon}): {age}");
+                            }
+                        }
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&resp)?);
+                    }
+                }
+                _ => emit(&resp, &fmt)?,
+            }
+        }
+
+        Commands::Discovery { r#type } => {
+            let resp = match r#type.as_str() {
+                "filter-keys" => client
+                    .get_filter_keys()
+                    .await
+                    .context("Failed to get filter keys")?,
+                "group-bys" => client
+                    .get_group_bys()
+                    .await
+                    .context("Failed to get group-bys")?,
+                other => anyhow::bail!(
+                    "Unknown discovery type: {other}. Use 'filter-keys' or 'group-bys'."
+                ),
+            };
+
+            match fmt {
+                OutputFormat::Pretty => {
+                    println!("{}", serde_json::to_string_pretty(&resp)?);
+                }
+                _ => emit(&resp, &fmt)?,
             }
         }
 

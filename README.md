@@ -282,6 +282,75 @@ polaris triage history --project-id <PROJECT_ID> --issue-key <ISSUE_KEY>
 polaris triage history --project-id <PID> --issue-key <KEY> --limit 50
 ```
 
+### `polaris counts`
+
+Get roll-up counts of issues, optionally grouped by a field (severity, issue type, tool, etc.). Auto-resolves the main branch when `--branch-id` is omitted.
+
+```bash
+polaris counts --project-id <PROJECT_ID>
+polaris counts --project-id <PID> --branch-id <BID>
+polaris counts --project-id <PID> --group-by '[issue][taxonomy][id][011dfe05-00e5-4d8c-8746-a81fe44a120b]'
+```
+
+```
+GROUP                                    COUNT
+--------------------------------------------------
+Audit                                    0
+High                                     4
+Low                                      12
+Medium                                   3
+Not Specified                            0
+```
+
+The `--group-by` value must be a discovery value — use `polaris discovery --type group-bys` to list valid options.
+
+### `polaris trends`
+
+Get issue counts over time, grouped by status or severity. Auto-resolves the main branch when `--branch-id` is omitted.
+
+```bash
+polaris trends --project-id <PROJECT_ID>
+polaris trends --project-id <PID> --granularity month
+polaris trends --project-id <PID> --start-date 2025-01-01 --end-date 2025-12-31
+polaris trends --project-id <PID> --group-by '[issue][status]'
+```
+
+```
+Series: Open
+  2023-02-23T15:20:15.000Z: 0
+  2023-02-24T15:20:15.000Z: 6
+  ...
+
+Series: Closed
+  2023-02-23T15:20:15.000Z: 0
+  ...
+```
+
+### `polaris age`
+
+Get issue age metrics (average age for outstanding or resolved issues). Auto-resolves the main branch when `--branch-id` is omitted.
+
+```bash
+polaris age --project-id <PROJECT_ID>
+polaris age --project-id <PID> --branch-id <BID>
+polaris age --project-id <PID> --metric resolved
+```
+
+```
+Average age (Low): 814.0 days
+```
+
+Metric options: `outstanding` (default), `resolved`.
+
+### `polaris discovery`
+
+Query available group-by values and filter keys. Useful for finding valid `--group-by` arguments for `counts` and `trends`.
+
+```bash
+polaris discovery --type group-bys
+polaris discovery --type filter-keys
+```
+
 ## Library Usage (`polaris-api`)
 
 The `polaris-api` crate can be used independently in Rust projects:
@@ -362,7 +431,8 @@ The CLI always uses `list_all_*` methods. The library exposes both for flexibili
 |---|---|---|---|
 | Auth | `/api/auth/v2` | `POST /authenticate` | Hand-crafted |
 | Common Objects | `/api/common/v0` | Projects, branches, runs | Hand-crafted |
-| Issue Query | `/api/query/v1` | List issues, get issue | Progenitor + hand-crafted |
+| Issue Query | `/api/query/v1` | List issues, get issue, roll-up counts, issues over time, issue age | Progenitor + hand-crafted |
+| Issue Discovery | `/api/query/v1/discovery` | Filter keys, group-bys | Hand-crafted |
 | Code Analysis | `/api/code-analysis/v0` | Events with source, source code | Hand-crafted |
 | Triage Command | `/api/triage-command/v1` | Update triage | Progenitor |
 | Triage Query | `/api/triage-query/v1` | Current triage, history | Progenitor |

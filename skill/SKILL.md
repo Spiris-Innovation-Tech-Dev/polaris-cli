@@ -121,6 +121,42 @@ View triage history:
 $POLARIS triage history --toon --project-id <PROJECT_UUID> --issue-key <ISSUE_KEY> --limit 20
 ```
 
+### Counts & Metrics
+
+Roll-up counts of issues. Auto-resolves main branch when `--branch-id` is omitted.
+The `--group-by` value must be a discovery value (see Discovery below), not a plain name.
+```bash
+# Total counts (no grouping)
+$POLARIS counts --toon --project-id <PROJECT_UUID>
+# Grouped by severity (use the value from `discovery --type group-bys`)
+$POLARIS counts --toon --project-id <PID> --group-by '[issue][taxonomy][id][011dfe05-00e5-4d8c-8746-a81fe44a120b]'
+# With explicit branch
+$POLARIS counts --toon --project-id <PID> --branch-id <BID>
+```
+
+Issue trends over time. Auto-resolves main branch when `--branch-id` is omitted.
+```bash
+$POLARIS trends --toon --project-id <PROJECT_UUID>
+$POLARIS trends --toon --project-id <PID> --granularity month --start-date 2025-01-01 --end-date 2025-12-31
+$POLARIS trends --toon --project-id <PID> --group-by '[issue][status]'
+```
+
+Issue age metrics:
+```bash
+# Auto-resolves main branch when --branch-id is omitted
+$POLARIS age --toon --project-id <PROJECT_UUID>
+$POLARIS age --toon --project-id <PID> --branch-id <BID> --metric resolved
+```
+
+Metric options: `outstanding` (default), `resolved`.
+
+Discovery — query available group-by values and filter keys. **Run this first** to get
+valid `--group-by` values for `counts` and `trends` commands.
+```bash
+$POLARIS discovery --toon --type group-bys
+$POLARIS discovery --toon --type filter-keys
+```
+
 ## Typical Workflow
 
 1. Find the project: `$POLARIS projects --toon --name "my-project"`
