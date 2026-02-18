@@ -62,6 +62,22 @@ The CLI resolves the API token in this order:
 
 Generate an API token from the Polaris web UI under your user settings. Tokens authenticate via `POST /api/auth/v2/authenticate` and produce a JWT valid for 12 hours; the client handles this transparently.
 
+### Configuration File
+
+You can persist the base URL in a TOML config file so you don't need `--base-url` or `POLARIS_BASE_URL` on every invocation:
+
+```toml
+# ~/.config/polaris/config.toml  (macOS/Linux)
+base_url = "https://visma.cop.blackduck.com"
+```
+
+**Base URL resolution order:**
+
+1. `--base-url` flag
+2. `POLARIS_BASE_URL` environment variable
+3. Config file (`~/.config/polaris/config.toml`)
+4. Built-in default
+
 ## Output Formats
 
 All commands support three output formats via a global flag:

@@ -19,3 +19,5 @@ toon-rs = "2.1.0"
 urlencoding = "2"
 keyring = { version = "3", features = ["apple-native"] }
 whoami = "1"
+dirs = "6"
+toml = "0.8"

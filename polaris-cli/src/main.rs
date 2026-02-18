@@ -6,6 +6,20 @@ use polaris_api::client::{PolarisClient, PolarisConfig, TriageValues};
 
 const KEYRING_SERVICE: &str = "polaris-cli";
 const KEYRING_USER: &str = "api-token";
+const BASE_URL_PLACEHOLDER: &str = "https://your-instance.polaris.blackduck.com";
+
+#[derive(Default, serde::Deserialize)]
+struct Config {
+    base_url: Option<String>,
+}
+
+fn load_config() -> Config {
+    dirs::home_dir()
+        .map(|d| d.join(".config/polaris/config.toml"))
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|s| toml::from_str(&s).ok())
+        .unwrap_or_default()
+}
 
 #[derive(Debug, Clone, ValueEnum)]
 enum OutputFormat {
@@ -308,7 +322,13 @@ fn make_client(cli: &Cli) -> Result<PolarisClient> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    if cli.base_url == BASE_URL_PLACEHOLDER {
+        let config = load_config();
+        if let Some(url) = config.base_url {
+            cli.base_url = url;
+        }
+    }
     let fmt = cli.output_format();
 
     // Auth subcommands that don't need a client

@@ -35,6 +35,17 @@ optimized for LLM context windows. Never use `--format pretty` or omit the flag.
 $POLARIS --toon <command> [options]
 ```
 
+## Configuration
+
+The base URL can be persisted in `~/.config/polaris/config.toml` so `--base-url` is not
+needed on every invocation:
+
+```toml
+base_url = "https://visma.cop.blackduck.com"
+```
+
+Resolution order: `--base-url` flag > `POLARIS_BASE_URL` env > config file > default.
+
 ## Authentication
 
 Before any command will work, an API token must be available. Resolution order:
