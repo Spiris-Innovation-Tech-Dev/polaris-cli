@@ -1,7 +1,15 @@
 [package]
 name = "polaris-api"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
+description = "Rust API client library for Black Duck Polaris."
+license = "MIT"
+repository = "https://github.com/Spiris-Innovation-Tech-Dev/polaris-cli"
+homepage = "https://www.blackduck.com/products/polaris-software-integrity-platform.html"
+documentation = "https://docs.rs/polaris-api"
+readme = "README.md"
+keywords = ["blackduck", "polaris", "coverity", "security", "api-client"]
+categories = ["api-bindings"]
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
