@@ -9,7 +9,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "polaris-api/**"
-      - "polaris-cli/**"
   workflow_dispatch:
 
 permissions:
@@ -70,35 +69,3 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  publish-polaris-cli:
-    name: Publish polaris-cli
-    needs: publish-polaris-api
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Check polaris-cli version on crates.io
-        id: check_version
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' polaris-cli/Cargo.toml | head -1)"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-          STATUS="$(curl -sS -o /dev/null -w "%{http_code}" -H "User-Agent: polaris-cli-ci/1.0" "https://crates.io/api/v1/crates/polaris-cli/${VERSION}")"
-          if [[ "${STATUS}" == "200" ]]; then
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            echo "polaris-cli ${VERSION} already exists on crates.io"
-          else
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            echo "polaris-cli ${VERSION} does not exist on crates.io"
-          fi
-
-      - name: Publish polaris-cli
-        if: steps.check_version.outputs.should_publish == 'true'
-        run: cargo publish -p polaris-cli
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
