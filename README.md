@@ -3,6 +3,7 @@
 Rust workspace for working with the Black Duck Polaris platform from code and the terminal.
 
 [![crate: polaris-api](https://img.shields.io/crates/v/polaris-api.svg)](https://crates.io/crates/polaris-api)
+[![crate: polaris-cli](https://img.shields.io/crates/v/polaris-cli.svg)](https://crates.io/crates/polaris-cli)
 [![docs.rs](https://docs.rs/polaris-api/badge.svg)](https://docs.rs/polaris-api)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Spiris-Innovation-Tech-Dev/polaris-cli)
 
@@ -35,6 +36,14 @@ export POLARIS_API_TOKEN="your-api-token"
 ```
 
 ## Install the CLI
+
+From crates.io:
+
+```bash
+cargo install polaris-cli
+```
+
+Or from source:
 
 ```bash
 cargo install --path polaris-cli
